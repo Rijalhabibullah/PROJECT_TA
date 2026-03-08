@@ -1,0 +1,34 @@
+================================================================================
+RICE LEAF DISEASE CLASSIFICATION - MODEL TRAINING REPORT
+================================================================================
+
+DATASET INFORMATION:
+--------------------------------------------------------------------------------
+Total Training Samples:      3278
+Total Validation Samples:     703
+Total Test Samples:           703
+Number of Classes:              3
+Classes:                   Bacterialblight, Brownspot, Leafsmut
+Image Size (pixels):       224 x 224
+
+TRAINING CONFIGURATION:
+--------------------------------------------------------------------------------
+Epochs:                    50
+Batch Size:                32
+Optimizer:                 Adam (lr=0.001)
+Loss Function:             Categorical Crossentropy
+Total Epochs Trained:      50
+
+MODEL PERFORMANCE:
+--------------------------------------------------------------------------------
+Test Loss:                 0.0002
+Test Accuracy:             1.0000
+Best Training Accuracy:    0.9942
+Best Validation Accuracy:  1.0000
+
+SAVED FILES:
+--------------------------------------------------------------------------------
+Model Weights:             rice_leaf_disease_model.keras
+Model Architecture:        rice_leaf_disease_model.json
+Model Summary:             model_summary.txt
+Training Report:           training_report.txt

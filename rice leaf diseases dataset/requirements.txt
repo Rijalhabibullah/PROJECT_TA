@@ -1,0 +1,15 @@
+# Core dependencies untuk Rice Leaf Disease CNN Classification
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+opencv-python
+jupyter
+ipykernel
+
+# Core ML framework
+tensorflow
+flask
+flask-cors
+pillow
