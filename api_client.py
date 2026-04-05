@@ -13,12 +13,12 @@ import json
 class RiceLeafClassificationAPI:
     """Client untuk Rice Leaf Disease Classification API"""
     
-    def __init__(self, base_url: str = "http://127.0.0.1:8000/api/classification"):
+    def __init__(self, base_url: str = "http://127.0.0.1:5000"):
         """
         Initialize API client
         
         Args:
-            base_url: Base URL untuk API endpoint
+            base_url: Base URL untuk API endpoint (default: Flask API on port 5000)
         """
         self.base_url = base_url
         self.session = requests.Session()
@@ -32,10 +32,13 @@ class RiceLeafClassificationAPI:
             Tuple (success, message)
         """
         try:
-            response = self.session.get(f"{self.base_url}/test", timeout=10)
+            response = self.session.get(f"{self.base_url}/health", timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                return data['success'], data.get('message', 'Connection OK')
+                if 'status' in data:  # Flask API response
+                    return data['status'] == 'ok', data.get('message', 'Connection OK')
+                else:
+                    return data.get('success', True), data.get('message', 'Connection OK')
             else:
                 return False, f"HTTP {response.status_code}"
         except Exception as e:
@@ -70,7 +73,7 @@ class RiceLeafClassificationAPI:
         
         try:
             # Tentukan endpoint
-            endpoint = "classify-and-save" if save else "classify"
+            endpoint = "classify" if not save else "classify"
             url = f"{self.base_url}/{endpoint}"
             
             # Baca dan kirim file
