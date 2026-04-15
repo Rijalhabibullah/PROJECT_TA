@@ -6,10 +6,24 @@ use Illuminate\Support\Facades\Storage;
 
 class DatasetController extends Controller
 {
-    public function index() {
-        $datasets = Dataset::all();
-        // Hitung jumlah per label untuk statistik mini
+    public function index(Request $request) {
+        // Get filter parameters
+        $label = $request->get('label');
+
+        // Build query
+        $query = Dataset::query();
+
+        // Apply label filter
+        if ($label) {
+            $query->where('label', $label);
+        }
+
+        // Get paginated datasets (15 per page) and keep current filters in pagination links
+        $datasets = $query->orderByDesc('id')->paginate(15)->withQueryString();
+
+        // Get statistics
         $stats = Dataset::selectRaw('label, count(*) as total')->groupBy('label')->get();
+
         return view('admin.datasets.index', compact('datasets', 'stats'));
     }
 
