@@ -3,59 +3,60 @@ Simple test script untuk menguji API Classification
 """
 
 import requests
-import base64
 import json
 from pathlib import Path
 
 # Konfigurasi
 LARAVEL_API_BASE = "http://127.0.0.1:8000/api/classification"
-PYTHON_API_BASE = "http://127.0.0.1:5000"
 
-def test_python_api_health():
-    """Test health check Python API"""
+def test_laravel_api_health():
+    """Test health check API klasifikasi di Laravel"""
     print("\n" + "="*60)
-    print("TEST 1: Python API Health Check")
+    print("TEST 1: Laravel Classification Health Check")
     print("="*60)
     
     try:
-        response = requests.get(f"{PYTHON_API_BASE}/health", timeout=5)
+        response = requests.get(f"{LARAVEL_API_BASE}/health", timeout=15)
         
         if response.status_code == 200:
             data = response.json()
-            print("✅ Python API berhasil dihubungi!")
-            print(f"   Status: {data['status']}")
-            print(f"   Model Loaded: {data['model_loaded']}")
-            print(f"   Classes: {', '.join(data['classes'])}")
+            print("✅ Laravel API berhasil dihubungi!")
+            print(f"   Success: {data.get('success')}")
+            print(f"   Message: {data.get('message')}")
+            model_info = data.get('model_info', {})
+            print(f"   Model Loaded: {model_info.get('model_loaded')}")
+            print(f"   Classes: {', '.join(model_info.get('classes', []))}")
             return True
         else:
             print(f"❌ API responded with status {response.status_code}")
+            print(f"   Response: {response.text}")
             return False
             
     except requests.exceptions.ConnectionError:
-        print("❌ Tidak dapat menghubungi Python API")
-        print(f"   Pastikan server berjalan di {PYTHON_API_BASE}")
+        print("❌ Tidak dapat menghubungi Laravel API")
+        print("   Pastikan server berjalan di http://127.0.0.1:8000")
         return False
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         return False
 
 
-def test_laravel_api_connection():
-    """Test connection via Laravel API"""
+def test_laravel_api_info():
+    """Test endpoint info model via Laravel API"""
     print("\n" + "="*60)
-    print("TEST 2: Laravel API Connection Test")
+    print("TEST 2: Laravel Model Info")
     print("="*60)
     
     try:
-        response = requests.get(f"{LARAVEL_API_BASE}/test", timeout=5)
+        response = requests.get(f"{LARAVEL_API_BASE}/info", timeout=15)
         
         if response.status_code == 200:
             data = response.json()
-            print("✅ Laravel API berhasil dihubungi!")
+            print("✅ Endpoint info berhasil diakses!")
             print(f"   Success: {data['success']}")
             print(f"   Message: {data['message']}")
-            if 'model_info' in data:
-                print(f"   Model Info: {json.dumps(data['model_info'], indent=2)}")
+            if 'data' in data:
+                print(f"   Model Info: {json.dumps(data['data'], indent=2)}")
             return True
         else:
             print(f"❌ API responded with status {response.status_code}")
@@ -167,11 +168,9 @@ def main():
     print("# Rice Leaf Disease Classification API - Test Suite")
     print("#" * 60)
     
-    # Test Python API
-    python_ok = test_python_api_health()
-    
-    # Test Laravel API
-    laravel_ok = test_laravel_api_connection()
+    # Test Laravel API health dan info
+    health_ok = test_laravel_api_health()
+    info_ok = test_laravel_api_info()
     
     # Test dengan gambar contoh jika ada
     test_image_paths = [
@@ -202,8 +201,8 @@ def main():
     print("\n" + "="*60)
     print("TEST SUMMARY")
     print("="*60)
-    print(f"Python API:  {'✅ OK' if python_ok else '❌ FAILED'}")
-    print(f"Laravel API: {'✅ OK' if laravel_ok else '❌ FAILED'}")
+    print(f"Laravel Health: {'✅ OK' if health_ok else '❌ FAILED'}")
+    print(f"Laravel Info:   {'✅ OK' if info_ok else '❌ FAILED'}")
     print("\nUntuk hasil lengkap, sediakan file gambar test.\n")
 
 

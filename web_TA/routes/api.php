@@ -15,11 +15,16 @@ use App\Http\Controllers\ClassificationHistoryController;
 // Classification endpoints
 Route::prefix('classification')->group(function () {
     
-    // Test koneksi ke Python API
+    // Health check klasifikasi (alias test untuk backward compatibility)
+    Route::get('/health', [ClassificationController::class, 'health']);
+    Route::get('/info', [ClassificationController::class, 'info']);
     Route::get('/test', [ClassificationController::class, 'testConnection']);
     
     // Klasifikasi gambar (hanya analisis)
     Route::post('/classify', [ClassificationController::class, 'classify']);
+
+    // Klasifikasi gambar dari URL
+    Route::post('/classify-from-url', [ClassificationController::class, 'classifyFromUrl']);
     
     // Klasifikasi dan simpan gambar
     Route::post('/classify-and-save', [ClassificationController::class, 'classifyAndSave']);

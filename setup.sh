@@ -25,9 +25,9 @@ fi
 # Check model files
 echo ""
 echo "Cek file model..."
-if [ -f "rice_leaf_diseases dataset/rice_leaf_disease_model.keras" ]; then
+if [ -f "rice leaf diseases dataset/rice_leaf_disease_model.keras" ]; then
     echo "[OK] Model keras ditemukan"
-elif [ -f "rice_leaf_diseases dataset/rice_leaf_disease_model.h5" ]; then
+elif [ -f "rice leaf diseases dataset/rice_leaf_disease_model.h5" ]; then
     echo "[OK] Model h5 ditemukan"
 else
     echo "[WARNING] File model tidak ditemukan"
@@ -41,14 +41,13 @@ echo "========================================"
 echo ""
 echo "Langkah selanjutnya:"
 echo ""
-echo "1. Buka Terminal 1 dan jalankan Python API:"
-echo "   cd \"rice leaf diseases dataset\""
-echo "   python3 api_server.py"
-echo ""
-echo "2. Buka Terminal 2 dan jalankan Laravel:"
+echo "1. Buka Terminal 1 dan jalankan Laravel:"
 echo "   cd web_TA"
 echo "   php artisan serve"
 echo ""
-echo "3. Test API:"
+echo "2. Test API:"
 echo "   python3 test_api.py"
+echo ""
+echo "3. Pastikan dependency inferensi Python sudah terpasang:"
+echo "   pip3 install -r \"rice leaf diseases dataset/requirements_api.txt\""
 echo ""

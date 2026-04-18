@@ -44,15 +44,14 @@ echo ========================================
 echo.
 echo Langkah selanjutnya:
 echo.
-echo 1. Buka Terminal 1 dan jalankan Python API:
-echo    cd "rice leaf diseases dataset"
-echo    python api_server.py
-echo.
-echo 2. Buka Terminal 2 dan jalankan Laravel:
+echo 1. Buka Terminal 1 dan jalankan Laravel:
 echo    cd "web_TA"
 echo    php artisan serve
 echo.
-echo 3. Test API:
+echo 2. Test API:
 echo    python test_api.py
+echo.
+echo 3. Pastikan Python environment memiliki dependency inferensi:
+echo    pip install -r "rice leaf diseases dataset\requirements_api.txt"
 echo.
 pause

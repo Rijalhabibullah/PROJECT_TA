@@ -3,16 +3,20 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use App\Models\Classification;
+use App\Services\PythonClassificationService;
 
 class ClassificationController extends Controller
 {
-    private $pythonApiUrl = 'http://127.0.0.1:5000'; // URL Flask API
+    public function __construct(
+        private readonly PythonClassificationService $classificationService
+    ) {
+    }
 
     /**
-     * Menerima gambar dan mengirim ke Python API untuk klasifikasi
+     * Menerima gambar dan mengklasifikasi melalui service internal Laravel
      * POST /api/classify
      */
     public function classify(Request $request)
@@ -30,36 +34,44 @@ class ClassificationController extends Controller
             $imageContent = file_get_contents($file->getRealPath());
             $base64Image = base64_encode($imageContent);
 
-            // Kirim request ke Flask API
-            $response = Http::timeout(30)->post($this->pythonApiUrl . '/classify', [
+            // Jalankan klasifikasi melalui service lokal (tanpa Flask API)
+            $result = $this->classificationService->classifyFromBase64([
                 'image' => $base64Image,
                 'filename' => $file->getClientOriginalName(),
             ]);
 
-            // Cek apakah request berhasil
-            if ($response->failed()) {
+            if (!($result['success'] ?? false)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Gagal menghubungi model classification',
-                    'error' => $response->body()
+                    'error' => $result['message'] ?? 'Unknown error',
                 ], 500);
             }
-
-            $result = $response->json();
 
             // Tambahkan informasi detail tentang penyakit
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
-            // Save to database
-            Classification::create([
-                'filename' => $file->getClientOriginalName(),
-                'predicted_class' => $result['predicted_class'],
-                'confidence' => $result['confidence'],
-                'all_predictions' => $result['all_predictions'],
-                'disease_name' => $diseaseInfo['name'],
-                'severity' => $diseaseInfo['severity'],
-                'notes' => 'Classification without storage',
-            ]);
+            $savedToDatabase = true;
+            $persistenceWarning = null;
+
+            try {
+                Classification::create([
+                    'filename' => $file->getClientOriginalName(),
+                    'predicted_class' => $result['predicted_class'],
+                    'confidence' => $result['confidence'],
+                    'all_predictions' => $result['all_predictions'],
+                    'disease_name' => $diseaseInfo['name'],
+                    'severity' => $diseaseInfo['severity'],
+                    'notes' => 'Classification without storage',
+                ]);
+            } catch (\Throwable $dbException) {
+                $savedToDatabase = false;
+                $persistenceWarning = 'Klasifikasi berhasil, tetapi gagal simpan ke database.';
+                Log::warning('Classification result not persisted', [
+                    'filename' => $file->getClientOriginalName(),
+                    'error' => $dbException->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -70,6 +82,8 @@ class ClassificationController extends Controller
                     'confidence_value' => $result['confidence'],
                     'all_predictions' => $result['all_predictions'],
                     'disease_info' => $diseaseInfo,
+                    'saved_to_database' => $savedToDatabase,
+                    'persistence_warning' => $persistenceWarning,
                     'timestamp' => now(),
                 ]
             ], 200);
@@ -89,7 +103,7 @@ class ClassificationController extends Controller
     }
 
     /**
-     * Upload gambar dan simpan ke database, kemudian klasifikasi
+        * Upload gambar dan simpan ke database, kemudian klasifikasi
      * POST /api/classify-and-save
      */
     public function classifyAndSave(Request $request)
@@ -109,36 +123,47 @@ class ClassificationController extends Controller
             $imageContent = file_get_contents($file->getRealPath());
             $base64Image = base64_encode($imageContent);
 
-            // Kirim request ke Flask API
-            $response = Http::timeout(30)->post($this->pythonApiUrl . '/classify', [
+            // Jalankan klasifikasi melalui service lokal (tanpa Flask API)
+            $result = $this->classificationService->classifyFromBase64([
                 'image' => $base64Image,
                 'filename' => $file->getClientOriginalName(),
             ]);
 
-            if ($response->failed()) {
+            if (!($result['success'] ?? false)) {
                 // Hapus file yang sudah disimpan jika klasifikasi gagal
                 Storage::disk('public')->delete($storagePath);
                 
                 return response()->json([
                     'success' => false,
                     'message' => 'Gagal menghubungi model classification',
+                    'error' => $result['message'] ?? 'Unknown error',
                 ], 500);
             }
-
-            $result = $response->json();
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
-            // Save to database
-            Classification::create([
-                'image_path' => $storagePath,
-                'filename' => $file->getClientOriginalName(),
-                'predicted_class' => $result['predicted_class'],
-                'confidence' => $result['confidence'],
-                'all_predictions' => $result['all_predictions'],
-                'disease_name' => $diseaseInfo['name'],
-                'severity' => $diseaseInfo['severity'],
-                'notes' => $request->input('notes'),
-            ]);
+            $savedToDatabase = true;
+            $persistenceWarning = null;
+
+            try {
+                Classification::create([
+                    'image_path' => $storagePath,
+                    'filename' => $file->getClientOriginalName(),
+                    'predicted_class' => $result['predicted_class'],
+                    'confidence' => $result['confidence'],
+                    'all_predictions' => $result['all_predictions'],
+                    'disease_name' => $diseaseInfo['name'],
+                    'severity' => $diseaseInfo['severity'],
+                    'notes' => $request->input('notes'),
+                ]);
+            } catch (\Throwable $dbException) {
+                $savedToDatabase = false;
+                $persistenceWarning = 'Gambar berhasil diklasifikasi dan disimpan file, tetapi gagal simpan riwayat ke database.';
+                Log::warning('Classification file stored but DB persist failed', [
+                    'filename' => $file->getClientOriginalName(),
+                    'path' => $storagePath,
+                    'error' => $dbException->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -150,6 +175,8 @@ class ClassificationController extends Controller
                     'confidence_value' => $result['confidence'],
                     'all_predictions' => $result['all_predictions'],
                     'disease_info' => $diseaseInfo,
+                    'saved_to_database' => $savedToDatabase,
+                    'persistence_warning' => $persistenceWarning,
                     'notes' => $request->input('notes'),
                     'timestamp' => now(),
                 ]
@@ -170,34 +197,143 @@ class ClassificationController extends Controller
     }
 
     /**
-     * Test koneksi ke Python API
+     * Klasifikasi gambar dari URL
+     * POST /api/classification/classify-from-url
+     */
+    public function classifyFromUrl(Request $request)
+    {
+        try {
+            $request->validate([
+                'image_url' => 'required|url|max:2048',
+                'notes' => 'nullable|string|max:500',
+                'save' => 'nullable|boolean',
+            ]);
+
+            $imageUrl = $request->input('image_url');
+            $result = $this->classificationService->classifyFromUrl([
+                'image_url' => $imageUrl,
+            ]);
+
+            if (!($result['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Gagal memproses gambar dari URL',
+                ], 400);
+            }
+
+            $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
+
+            if ($request->boolean('save')) {
+                $urlPath = parse_url($imageUrl, PHP_URL_PATH);
+                $filename = is_string($urlPath) && $urlPath !== ''
+                    ? basename($urlPath)
+                    : 'from_url_image';
+
+                Classification::create([
+                    'filename' => $filename,
+                    'predicted_class' => $result['predicted_class'],
+                    'confidence' => $result['confidence'],
+                    'all_predictions' => $result['all_predictions'],
+                    'disease_name' => $diseaseInfo['name'],
+                    'severity' => $diseaseInfo['severity'],
+                    'notes' => $request->input('notes', 'Classification from URL'),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Klasifikasi dari URL berhasil',
+                'data' => [
+                    'url' => $imageUrl,
+                    'predicted_class' => $result['predicted_class'],
+                    'confidence' => round($result['confidence'] * 100, 2) . '%',
+                    'confidence_value' => $result['confidence'],
+                    'all_predictions' => $result['all_predictions'],
+                    'disease_info' => $diseaseInfo,
+                    'timestamp' => now(),
+                ]
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Health check klasifikasi service
+     * GET /api/classification/health
+     */
+    public function health()
+    {
+        try {
+            $result = $this->classificationService->health();
+
+            if ($result['status'] !== 'ok') {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Model tidak siap',
+                    'model_info' => $result,
+                ], 503);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Koneksi ke model classification berhasil',
+                'model_info' => $result,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat melakukan health check model: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Informasi model klasifikasi
+     * GET /api/classification/info
+     */
+    public function info()
+    {
+        try {
+            $result = $this->classificationService->info();
+
+            if (!($result['model_loaded'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Model tidak tersedia',
+                    'data' => $result,
+                ], 503);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Informasi model berhasil diambil',
+                'data' => $result,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil informasi model: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Backward-compatible endpoint test (alias untuk health)
      * GET /api/classification/test
      */
     public function testConnection()
     {
-        try {
-            $response = Http::timeout(10)->post($this->pythonApiUrl . '/health', []);
-
-            if ($response->successful()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Koneksi ke model API berhasil',
-                    'model_info' => $response->json()
-                ], 200);
-            }
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Model API tidak merespons dengan benar'
-            ], 500);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak dapat menghubungi model API: ' . $e->getMessage(),
-                'hint' => 'Pastikan server Python API sudah berjalan di ' . $this->pythonApiUrl
-            ], 500);
-        }
+        return $this->health();
     }
 
     /**
