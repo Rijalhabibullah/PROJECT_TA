@@ -25,7 +25,7 @@
             <div class="p-4 border-b bg-gray-50 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <h3 class="text-lg font-bold text-gray-800">Data History Classification</h3>
                 <form method="GET" class="flex gap-2">
-                    <input type="text" name="jenis_penyakit" value="{{ request('jenis_penyakit') }}" placeholder="Filter penyakit..." class="border border-gray-300 rounded-lg p-2 text-sm">
+                    <input type="text" name="keyword" value="{{ request('keyword') }}" placeholder="Cari penyakit, user, atau lokasi..." class="border border-gray-300 rounded-lg p-2 text-sm">
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm">Filter</button>
                 </form>
             </div>
@@ -37,6 +37,7 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jenis Penyakit</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Waktu</th>
                             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Aksi</th>
                         </tr>
@@ -47,6 +48,9 @@
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $history->id }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $history->user->name ?? '-' }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $history->jenis_penyakit }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700">
+                                {{ $history->location_address ?? 'Alamat tidak terdeteksi' }}
+                            </td>
                             <td class="px-4 py-3 text-sm text-gray-500">{{ $history->created_at?->format('d M Y H:i') }}</td>
                             <td class="px-4 py-3 text-right text-sm">
                                 <button type="button" onclick="toggleEdit({{ $history->id }})" class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
@@ -58,7 +62,7 @@
                             </td>
                         </tr>
                         <tr id="edit-row-{{ $history->id }}" class="hidden bg-gray-50">
-                            <td colspan="5" class="px-4 py-3">
+                            <td colspan="6" class="px-4 py-3">
                                 <form action="{{ route('history-klasifikasi.update', $history->id) }}" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     @csrf
                                     @method('PUT')
@@ -80,7 +84,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">Belum ada data history classification.</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">Belum ada data history classification.</td>
                         </tr>
                         @endforelse
                     </tbody>

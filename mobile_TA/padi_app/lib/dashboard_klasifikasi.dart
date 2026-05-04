@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart'; // Penting untuk kIsWeb
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Pastikan file result_screen.dart sudah kamu buat di folder lib/screen/
 import 'screen/result_screen.dart';
@@ -23,7 +26,11 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _errorMessage;
 
   Future<void> _getImage(ImageSource source) async {
-    final pickedFile = await _picker.pickImage(source: source);
+    final pickedFile = await _picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1280,
+    );
     if (pickedFile != null) {
       setState(() {
         if (kIsWeb) {
@@ -92,8 +99,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      final location = await _resolveLocation();
       final imageFile = _image ?? File(_webImage!.path);
-      final result = await _classificationService.classifyAndSave(imageFile);
+      final result = await _classificationService.classifyAndSave(
+        imageFile,
+        locationAddress: location?.address,
+        locationLat: location?.lat,
+        locationLng: location?.lng,
+      );
+
+      // Validasi: cek apakah confidence cukup tinggi (artinya itu daun padi)
+      const double confidenceThreshold = 0.85; // 85% minimum - sangat ketat
+      if (result.confidenceValue < confidenceThreshold) {
+        if (mounted) {
+          _showNotRiceLeafWarning(context);
+        }
+        return;
+      }
 
       if (mounted) {
         Navigator.push(
@@ -104,9 +126,18 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      
+      // Cek apakah error dari backend tentang bukan daun padi
+      if (errorMsg.contains('Bukan daun padi')) {
+        if (mounted) {
+          _showNotRiceLeafWarning(context);
+        }
+      } else {
+        setState(() {
+          _errorMessage = errorMsg;
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -114,6 +145,97 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  Future<_LocationPayload?> _resolveLocation() async {
+    if (kIsWeb) {
+      return null;
+    }
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return null;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return null;
+    }
+
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    final placemarks = await placemarkFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
+
+    String? address;
+    if (placemarks.isNotEmpty) {
+      final place = placemarks.first;
+      final parts = [
+        place.street,
+        place.subLocality,
+        place.locality,
+        place.administrativeArea,
+        place.country,
+      ].where((part) => part != null && part!.trim().isNotEmpty)
+          .map((part) => part!.trim())
+          .toList();
+
+      if (parts.isNotEmpty) {
+        address = parts.join(', ');
+      }
+    }
+
+    if (address != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_location', address);
+      await prefs.setDouble('user_location_lat', position.latitude);
+      await prefs.setDouble('user_location_lng', position.longitude);
+    }
+
+    return _LocationPayload(
+      address: address,
+      lat: position.latitude,
+      lng: position.longitude,
+    );
+  }
+
+  void _showNotRiceLeafWarning(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              SizedBox(width: 10),
+              Text('Bukan Daun Padi'),
+            ],
+          ),
+          content: const Text(
+            'Foto yang Anda upload terdeteksi bukan daun padi. '
+            'Silahkan upload foto daun padi yang jelas dan bagus untuk hasil deteksi penyakit yang akurat.',
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Kembali ke Upload'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -286,4 +408,16 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+class _LocationPayload {
+  final String? address;
+  final double lat;
+  final double lng;
+
+  const _LocationPayload({
+    required this.address,
+    required this.lat,
+    required this.lng,
+  });
 }

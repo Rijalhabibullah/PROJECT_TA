@@ -13,6 +13,14 @@ class ClassificationHistory extends Model
     protected $fillable = [
         'user_id',
         'jenis_penyakit',
+        'location_address',
+        'location_lat',
+        'location_lng',
+    ];
+
+    protected $casts = [
+        'location_lat' => 'float',
+        'location_lng' => 'float',
     ];
 
     public function user(): BelongsTo

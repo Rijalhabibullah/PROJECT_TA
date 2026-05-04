@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Dataset;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -24,12 +25,18 @@ class DashboardController extends Controller
         
         // Total produk
         $totalProducts = Product::count();
+
+        // Total user dan user terbaru
+        $totalUsers = User::count();
+        $recentUsers = User::orderByDesc('created_at')->take(10)->get();
         
         return view('dashboard', compact(
             'totalDataset',
             'diseaseStats',
             'mostCommonDisease',
-            'totalProducts'
+            'totalProducts',
+            'totalUsers',
+            'recentUsers'
         ));
     }
 }

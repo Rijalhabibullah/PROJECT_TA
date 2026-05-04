@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 // import 'login_screen.dart'; // Nanti ini dipakai untuk kembali ke halaman login
 
 class RegisterScreen extends StatefulWidget {
@@ -12,18 +14,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
 
-  void _register() {
-    // TODO: Tambahkan logika pendaftaran ke database di sini
-    
-    // Contoh jika register berhasil, munculkan pesan dan kembali ke Login
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Registrasi Berhasil! Silakan Login.'),
-        backgroundColor: Color(0xFF0F703A), // Hijau sesuai tema
-      ),
-    );
-    Navigator.pop(context); // Kembali ke halaman Login
+  void _register() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (username.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Semua field wajib diisi'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Konfirmasi password tidak cocok'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://gobony-wedgy-cathi.ngrok-free.dev/api/mobile/register'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'username': username,
+              'password': password,
+              'password_confirmation': confirmPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 201) {
+        final jsonResponse = jsonDecode(response.body);
+        throw Exception(jsonResponse['message'] ?? 'Registrasi gagal');
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Registrasi berhasil! Silakan login.'),
+          backgroundColor: Color(0xFF0F703A),
+        ),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Registrasi gagal: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -63,7 +119,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _buildTextField(
                   hintText: 'Password',
                   controller: _passwordController,
-                  obscureText: true, // Teks disembunyikan
+                  obscureText: !_isPasswordVisible,
+                  showToggle: true,
+                  onToggle: () {
+                    setState(() {
+                      _isPasswordVisible = !_isPasswordVisible;
+                    });
+                  },
                 ),
                 const SizedBox(height: 20),
 
@@ -71,7 +133,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _buildTextField(
                   hintText: 'Konfirmasi Password',
                   controller: _confirmPasswordController,
-                  obscureText: true, // Teks disembunyikan
+                  obscureText: !_isConfirmPasswordVisible,
+                  showToggle: true,
+                  onToggle: () {
+                    setState(() {
+                      _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                    });
+                  },
                 ),
                 const SizedBox(height: 50),
 
@@ -131,6 +199,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String hintText,
     required TextEditingController controller,
     required bool obscureText,
+    bool showToggle = false,
+    VoidCallback? onToggle,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -155,6 +225,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
             borderSide: BorderSide.none, // Menghilangkan garis pinggir bawaan
           ),
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          suffixIcon: showToggle
+              ? IconButton(
+                  onPressed: onToggle,
+                  icon: Icon(
+                    obscureText ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey,
+                  ),
+                )
+              : null,
         ),
       ),
     );

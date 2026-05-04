@@ -119,6 +119,24 @@ def _preprocess_image(image_bytes: bytes):
     return img_array
 
 
+def _estimate_leafiness(image_bytes: bytes) -> float:
+    image = Image.open(BytesIO(image_bytes))
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+
+    image = image.resize((128, 128))
+    hsv = image.convert("HSV")
+    hsv_array = np.array(hsv)
+
+    hue = hsv_array[:, :, 0]
+    sat = hsv_array[:, :, 1]
+    val = hsv_array[:, :, 2]
+
+    # Heuristic: green-ish pixels with enough saturation and brightness.
+    green_mask = (hue >= 50) & (hue <= 140) & (sat >= 40) & (val >= 40)
+    return float(np.mean(green_mask))
+
+
 def _predict(image_bytes: bytes, model_dir: str) -> dict:
     model = _load_model(model_dir)
 
@@ -134,11 +152,14 @@ def _predict(image_bytes: bytes, model_dir: str) -> dict:
         for idx, class_name in enumerate(CLASS_NAMES)
     }
 
+    leafiness = _estimate_leafiness(image_bytes)
+
     return {
         "success": True,
         "predicted_class": predicted_class,
         "confidence": confidence,
         "all_predictions": all_predictions,
+        "leafiness": leafiness,
         "model_path": MODEL_PATH,
     }
 

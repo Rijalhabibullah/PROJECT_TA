@@ -5,7 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use App\Models\Classification;
+use App\Models\ClassificationHistory;
+use App\Models\User;
 use App\Services\PythonClassificationService;
 
 class ClassificationController extends Controller
@@ -25,6 +29,9 @@ class ClassificationController extends Controller
             // Validasi input
             $request->validate([
                 'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // Max 5MB
+                'location_address' => 'nullable|string|max:255',
+                'location_lat' => 'nullable|numeric',
+                'location_lng' => 'nullable|numeric',
             ]);
 
             // Ambil file gambar
@@ -48,6 +55,15 @@ class ClassificationController extends Controller
                 ], 500);
             }
 
+            $minLeafiness = 0.12;
+            if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bukan daun padi - Foto yang Anda upload terdeteksi bukan daun padi. Silahkan upload foto daun padi yang sesuai.',
+                    'is_not_rice_leaf' => true,
+                ], 422);
+            }
+
             // Tambahkan informasi detail tentang penyakit
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
@@ -56,6 +72,7 @@ class ClassificationController extends Controller
 
             try {
                 Classification::create([
+                    'user_id' => $request->input('user_id'),
                     'filename' => $file->getClientOriginalName(),
                     'predicted_class' => $result['predicted_class'],
                     'confidence' => $result['confidence'],
@@ -63,6 +80,12 @@ class ClassificationController extends Controller
                     'disease_name' => $diseaseInfo['name'],
                     'severity' => $diseaseInfo['severity'],
                     'notes' => 'Classification without storage',
+                    'location_address' => $request->input('location_address'),
+                    'location_lat' => $request->input('location_lat'),
+                    'location_lng' => $request->input('location_lng'),
+                    'location_address' => $request->input('location_address'),
+                    'location_lat' => $request->input('location_lat'),
+                    'location_lng' => $request->input('location_lng'),
                 ]);
             } catch (\Throwable $dbException) {
                 $savedToDatabase = false;
@@ -112,7 +135,12 @@ class ClassificationController extends Controller
             // Validasi input
             $request->validate([
                 'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120',
-                'notes' => 'nullable|string|max:500'
+                'notes' => 'nullable|string|max:500',
+                'user_id' => 'nullable|exists:users,id',
+                'user_name' => 'nullable|string|max:255',
+                'location_address' => 'nullable|string|max:255',
+                'location_lat' => 'nullable|numeric',
+                'location_lng' => 'nullable|numeric',
             ]);
 
             // Simpan gambar
@@ -139,6 +167,31 @@ class ClassificationController extends Controller
                     'error' => $result['message'] ?? 'Unknown error',
                 ], 500);
             }
+
+            $minLeafiness = 0.12;
+            if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
+                Storage::disk('public')->delete($storagePath);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bukan daun padi - Foto yang Anda upload terdeteksi bukan daun padi. Silahkan upload foto daun padi yang sesuai.',
+                    'is_not_rice_leaf' => true,
+                ], 422);
+            }
+
+            // Validasi confidence - jika rendah berarti bukan daun padi
+            $minConfidence = 0.80; // 80% minimum confidence
+            if ($result['confidence'] < $minConfidence) {
+                // Hapus file yang sudah disimpan jika confidence terlalu rendah
+                Storage::disk('public')->delete($storagePath);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bukan daun padi - Foto yang Anda upload terdeteksi bukan daun padi. Silahkan upload foto daun padi yang jelas dan bagus.',
+                    'is_not_rice_leaf' => true,
+                ], 422);
+            }
+
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
             $savedToDatabase = true;
@@ -146,6 +199,7 @@ class ClassificationController extends Controller
 
             try {
                 Classification::create([
+                    'user_id' => $request->input('user_id'),
                     'image_path' => $storagePath,
                     'filename' => $file->getClientOriginalName(),
                     'predicted_class' => $result['predicted_class'],
@@ -154,6 +208,9 @@ class ClassificationController extends Controller
                     'disease_name' => $diseaseInfo['name'],
                     'severity' => $diseaseInfo['severity'],
                     'notes' => $request->input('notes'),
+                    'location_address' => $request->input('location_address'),
+                    'location_lat' => $request->input('location_lat'),
+                    'location_lng' => $request->input('location_lng'),
                 ]);
             } catch (\Throwable $dbException) {
                 $savedToDatabase = false;
@@ -163,6 +220,53 @@ class ClassificationController extends Controller
                     'path' => $storagePath,
                     'error' => $dbException->getMessage(),
                 ]);
+            }
+
+            $historyUserId = null;
+            if ($request->filled('user_id')) {
+                $historyUserId = (int) $request->input('user_id');
+            } elseif ($request->filled('user_name')) {
+                $userName = trim((string) $request->input('user_name'));
+                if ($userName !== '') {
+                    $baseSlug = Str::slug($userName, '.');
+                    if ($baseSlug === '') {
+                        $baseSlug = 'user';
+                    }
+
+                    $email = $baseSlug . '@agripadi.local';
+                    $counter = 1;
+                    while (User::where('email', $email)->exists()) {
+                        $email = $baseSlug . $counter . '@agripadi.local';
+                        $counter++;
+                    }
+
+                    $user = User::firstOrCreate(
+                        ['name' => $userName],
+                        [
+                            'email' => $email,
+                            'password' => Hash::make(Str::random(12)),
+                            'role' => 'user',
+                        ]
+                    );
+                    $historyUserId = $user->id;
+                }
+            }
+
+            if ($historyUserId) {
+                try {
+                    ClassificationHistory::create([
+                        'user_id' => $historyUserId,
+                        'jenis_penyakit' => $diseaseInfo['name'] ?? $result['predicted_class'],
+                        'location_address' => $request->input('location_address'),
+                        'location_lat' => $request->input('location_lat'),
+                        'location_lng' => $request->input('location_lng'),
+                    ]);
+                } catch (\Throwable $historyException) {
+                    Log::warning('Classification history not persisted', [
+                        'user_id' => $historyUserId,
+                        'error' => $historyException->getMessage(),
+                    ]);
+                }
             }
 
             return response()->json([
@@ -178,6 +282,9 @@ class ClassificationController extends Controller
                     'saved_to_database' => $savedToDatabase,
                     'persistence_warning' => $persistenceWarning,
                     'notes' => $request->input('notes'),
+                    'location_address' => $request->input('location_address'),
+                    'location_lat' => $request->input('location_lat'),
+                    'location_lng' => $request->input('location_lng'),
                     'timestamp' => now(),
                 ]
             ], 200);

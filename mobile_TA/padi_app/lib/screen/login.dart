@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../main.dart'; // Mengarah ke MainNavigation di main.dart
 import 'register_screen.dart'; 
 
@@ -13,17 +15,70 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
 
   // FUNGSI LOGIN TEGAS: Simpan status & Pindah ke Navigasi Utama
   void _login() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isLoggedIn', true); // Simpan status login permanen
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
 
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const MainNavigation()), 
-    );
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Username dan password wajib diisi'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://gobony-wedgy-cathi.ngrok-free.dev/api/mobile/login'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'username': username,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        throw Exception('Login gagal');
+      }
+
+      final jsonResponse = jsonDecode(response.body);
+      if (jsonResponse['success'] != true) {
+        throw Exception(jsonResponse['message'] ?? 'Login gagal');
+      }
+
+      final data = jsonResponse['data'] ?? {};
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setInt('user_id', data['user_id'] ?? 0);
+      await prefs.setString('user_name', data['name'] ?? username);
+      if (data['email'] != null) {
+        await prefs.setString('user_email', data['email'] ?? '');
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainNavigation()), 
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Login gagal: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -39,7 +94,17 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 40),
             _buildTextField(hintText: 'Username', controller: _usernameController, obscureText: false),
             const SizedBox(height: 20),
-            _buildTextField(hintText: 'Password', controller: _passwordController, obscureText: true),
+            _buildTextField(
+              hintText: 'Password',
+              controller: _passwordController,
+              obscureText: !_isPasswordVisible,
+              showToggle: true,
+              onToggle: () {
+                setState(() {
+                  _isPasswordVisible = !_isPasswordVisible;
+                });
+              },
+            ),
             const SizedBox(height: 40),
             _buildLoginButton(),
             const SizedBox(height: 25),
@@ -113,7 +178,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField({required String hintText, required TextEditingController controller, required bool obscureText}) {
+  Widget _buildTextField({
+    required String hintText,
+    required TextEditingController controller,
+    required bool obscureText,
+    bool showToggle = false,
+    VoidCallback? onToggle,
+  }) {
     return Container(
       width: 250,
       decoration: BoxDecoration(
@@ -129,6 +200,15 @@ class _LoginScreenState extends State<LoginScreen> {
           hintText: hintText,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          suffixIcon: showToggle
+              ? IconButton(
+                  onPressed: onToggle,
+                  icon: Icon(
+                    obscureText ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey,
+                  ),
+                )
+              : null,
         ),
       ),
     );

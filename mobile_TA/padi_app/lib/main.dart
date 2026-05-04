@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dashboard_klasifikasi.dart'; 
 import 'screen/history_screen.dart';
 import 'screen/ecommerce_screen.dart';
@@ -110,6 +112,14 @@ class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 1; // Track halaman yang sedang aktif
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _promptLocationPermission();
+    });
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -127,6 +137,80 @@ class _MainNavigationState extends State<MainNavigation> {
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
     );
+  }
+
+  Future<void> _promptLocationPermission() async {
+    if (kIsWeb) {
+      return;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission != LocationPermission.always &&
+        permission != LocationPermission.whileInUse) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (!mounted) return;
+
+    if (permission == LocationPermission.deniedForever) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Izin Lokasi Ditolak'),
+            content: const Text(
+              'Silakan aktifkan izin lokasi di Pengaturan jika ingin '
+              'menyimpan lokasi secara otomatis.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tutup'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await Geolocator.openAppSettings();
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                },
+                child: const Text('Buka Pengaturan'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (!mounted) return;
+      final openSettings = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Aktifkan Lokasi'),
+            content: const Text(
+              'Lokasi perangkat sedang mati. Aktifkan agar lokasi tersimpan '
+              'real time. Kamu tetap bisa klasifikasi tanpa lokasi.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Nanti'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Buka Pengaturan'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (openSettings == true) {
+        await Geolocator.openLocationSettings();
+      }
+    }
   }
 
   @override

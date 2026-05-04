@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ClassificationHistoryController;
 
@@ -29,6 +30,10 @@ Route::prefix('classification')->group(function () {
     // Klasifikasi dan simpan gambar
     Route::post('/classify-and-save', [ClassificationController::class, 'classifyAndSave']);
 });
+
+// Mobile auth endpoint
+Route::post('/mobile/login', [AuthController::class, 'mobileLogin']);
+Route::post('/mobile/register', [AuthController::class, 'mobileRegister']);
 
 // History endpoints
 Route::prefix('classifications')->group(function () {

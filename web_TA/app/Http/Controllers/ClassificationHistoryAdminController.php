@@ -12,8 +12,15 @@ class ClassificationHistoryAdminController extends Controller
     {
         $query = ClassificationHistory::with('user')->latest();
 
-        if ($request->filled('jenis_penyakit')) {
-            $query->where('jenis_penyakit', 'like', '%' . $request->jenis_penyakit . '%');
+        if ($request->filled('keyword')) {
+            $keyword = $request->keyword;
+            $query->where(function ($builder) use ($keyword) {
+                $builder->where('jenis_penyakit', 'like', '%' . $keyword . '%')
+                    ->orWhere('location_address', 'like', '%' . $keyword . '%')
+                    ->orWhereHas('user', function ($userQuery) use ($keyword) {
+                        $userQuery->where('name', 'like', '%' . $keyword . '%');
+                    });
+            });
         }
 
         $histories = $query->paginate(10)->withQueryString();

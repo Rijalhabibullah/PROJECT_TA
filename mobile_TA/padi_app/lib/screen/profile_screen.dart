@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -9,10 +11,199 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _userName = "Petani Padi";
-  String _userEmail = "petani@agripadi.com";
-  String _userPhone = "0812-3456-7890";
-  String _userLocation = "Jawa Barat";
+  String _userName = "";
+  String _userEmail = "";
+  String _userPhone = "";
+  String _userLocation = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+    _tryAutoFillLocation();
+  }
+
+  Future<void> _loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userName = prefs.getString('user_name') ?? '';
+      _userEmail = prefs.getString('user_email') ?? '';
+      _userPhone = prefs.getString('user_phone') ?? '';
+      _userLocation = prefs.getString('user_location') ?? '';
+    });
+  }
+
+  Future<void> _tryAutoFillLocation() async {
+    if (_userLocation.isNotEmpty) {
+      return;
+    }
+
+    final address = await _fetchCurrentAddress();
+    if (address == null) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_location', address);
+    if (mounted) {
+      setState(() {
+        _userLocation = address;
+      });
+    }
+  }
+
+  Future<String?> _fetchCurrentAddress() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return null;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return null;
+    }
+
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    final placemarks = await placemarkFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
+
+    if (placemarks.isEmpty) {
+      return null;
+    }
+
+    final place = placemarks.first;
+    final parts = [
+      place.street,
+      place.subLocality,
+      place.locality,
+      place.administrativeArea,
+      place.country,
+    ].where((part) => part != null && part!.trim().isNotEmpty)
+        .map((part) => part!.trim())
+        .toList();
+
+    if (parts.isEmpty) {
+      return null;
+    }
+
+    return parts.join(', ');
+  }
+
+  void _openEditProfile() {
+    final phoneController = TextEditingController(text: _userPhone);
+    final locationController = TextEditingController(text: _userLocation);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Edit Profil',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'No. Telepon',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: locationController,
+                decoration: const InputDecoration(
+                  labelText: 'Lokasi',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: () async {
+                  final address = await _fetchCurrentAddress();
+                  if (address == null) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Lokasi tidak terdeteksi'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  locationController.text = address;
+                },
+                icon: const Icon(Icons.my_location),
+                label: const Text('Gunakan lokasi saat ini'),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString(
+                          'user_phone',
+                          phoneController.text.trim(),
+                        );
+                        await prefs.setString(
+                          'user_location',
+                          locationController.text.trim(),
+                        );
+
+                        if (mounted) {
+                          setState(() {
+                            _userPhone = phoneController.text.trim();
+                            _userLocation = locationController.text.trim();
+                          });
+                        }
+
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F703A),
+                      ),
+                      child: const Text(
+                        'Simpan',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _logout() async {
     showDialog(
@@ -29,6 +220,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               SharedPreferences prefs = await SharedPreferences.getInstance();
               await prefs.setBool('isLoggedIn', false);
+              await prefs.remove('user_id');
+              await prefs.remove('user_name');
+              await prefs.remove('user_email');
+              await prefs.remove('user_phone');
+              await prefs.remove('user_location');
               if (mounted) {
                 Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
               }
@@ -91,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 20),
                   // Nama User
                   Text(
-                    _userName,
+                    _userName.isNotEmpty ? _userName : 'Pengguna',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -100,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    "Petani Padi",
+                    _userEmail.isNotEmpty ? _userEmail : 'Akun pengguna',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
@@ -122,18 +318,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.email,
                     label: "Email",
                     value: _userEmail,
+                    placeholder: 'Tambahkan email',
                   ),
                   const Divider(height: 20),
                   _buildProfileField(
                     icon: Icons.phone,
                     label: "No. Telepon",
                     value: _userPhone,
+                    placeholder: 'Tambahkan no telepon',
                   ),
                   const Divider(height: 20),
                   _buildProfileField(
                     icon: Icons.location_on,
                     label: "Lokasi",
                     value: _userLocation,
+                    placeholder: 'Tambahkan lokasi',
+                    maxLines: 3,
                   ),
                 ],
               ),
@@ -156,12 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Fitur edit profil akan segera tersedia'),
-                          backgroundColor: Colors.blue,
-                        ),
-                      );
+                      _openEditProfile();
                     },
                   ),
                 ),
@@ -222,27 +417,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     required String label,
     required String value,
+    required String placeholder,
+    int? maxLines,
   }) {
+    final displayValue = value.isNotEmpty ? value : placeholder;
+    final isPlaceholder = value.isEmpty;
+
     return Row(
       children: [
         Icon(icon, color: const Color(0xFF0F703A), size: 24),
         const SizedBox(width: 15),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                displayValue,
+                maxLines: maxLines,
+                overflow: maxLines != null ? TextOverflow.ellipsis : null,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isPlaceholder ? Colors.grey[500] : Colors.black,
+                  fontStyle: isPlaceholder ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

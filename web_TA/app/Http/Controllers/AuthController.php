@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -41,5 +44,83 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         return redirect('/');
+    }
+
+    // 4. Mobile Login
+    public function mobileLogin(Request $request)
+    {
+        $validated = $request->validate([
+            'username' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:4'],
+        ]);
+
+        $username = trim($validated['username']);
+        $password = $validated['password'];
+        $user = User::where('name', $username)->first();
+        if (!$user || !Hash::check($password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Username atau password salah',
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login mobile berhasil',
+            'data' => [
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+        ], 200);
+    }
+
+    // 5. Mobile Register
+    public function mobileRegister(Request $request)
+    {
+        $validated = $request->validate([
+            'username' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:4'],
+            'password_confirmation' => ['required', 'same:password'],
+        ]);
+
+        $username = trim($validated['username']);
+        $password = $validated['password'];
+
+        if (User::where('name', $username)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Username sudah digunakan',
+            ], 409);
+        }
+
+        $baseSlug = Str::slug($username, '.');
+        if ($baseSlug === '') {
+            $baseSlug = 'user';
+        }
+
+        $email = $baseSlug . '@agripadi.local';
+        $counter = 1;
+        while (User::where('email', $email)->exists()) {
+            $email = $baseSlug . $counter . '@agripadi.local';
+            $counter++;
+        }
+
+        $user = User::create([
+            'name' => $username,
+            'email' => $email,
+            'password' => Hash::make($password),
+            'role' => 'user',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Registrasi berhasil',
+            'data' => [
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+        ], 201);
     }
 }

@@ -11,10 +11,15 @@ class ClassificationHistoryController extends Controller
      * Get semua classification history
      * GET /api/classifications
      */
-    public function index()
+    public function index(Request $request)
     {
-        $classifications = Classification::orderBy('created_at', 'desc')
-            ->paginate(15);
+        $query = Classification::orderBy('created_at', 'desc');
+
+        if ($request->filled('user_id')) {
+            $query->where('user_id', (int) $request->input('user_id'));
+        }
+
+        $classifications = $query->paginate(15);
 
         return response()->json([
             'success' => true,

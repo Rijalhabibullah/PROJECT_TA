@@ -5,7 +5,7 @@
 @section('content')
 
 <!-- Kartu Statistik Utama -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     
     <!-- Kartu 1: Total Dataset (Citra Penyakit) -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between">
@@ -35,7 +35,21 @@
         </div>
     </div>
 
-    <!-- Kartu 3: Penyakit Terbanyak di Database -->
+    <!-- Kartu 3: Total User -->
+    <button type="button" onclick="toggleUserList()" class="text-left bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between hover:border-emerald-300 hover:shadow-md transition">
+        <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">👤 Total User</p>
+            <h3 class="text-3xl font-bold text-gray-800 mt-2">{{ number_format($totalUsers) }}</h3>
+            <span class="inline-block mt-2 text-xs text-emerald-600">Klik untuk lihat user terbaru</span>
+        </div>
+        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m6-3a4 4 0 11-8 0 4 4 0 018 0zm6 0a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </div>
+    </button>
+
+    <!-- Kartu 4: Penyakit Terbanyak di Database -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between">
         <div>
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">⚠️ Penyakit Terbanyak</p>
@@ -48,6 +62,45 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
+        </div>
+    </div>
+</div>
+
+<!-- Modal User Terbaru -->
+<div id="user-list-modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/40" onclick="toggleUserList()"></div>
+    <div class="relative mx-auto mt-20 w-full max-w-3xl px-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100">
+            <div class="flex items-center justify-between px-6 py-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800">User Terbaru</h3>
+                <button type="button" onclick="toggleUserList()" class="text-sm text-gray-500 hover:text-gray-700">Tutup</button>
+            </div>
+            <div class="max-h-[70vh] overflow-y-auto">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal Daftar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse($recentUsers as $user)
+                            <tr>
+                                <td class="px-4 py-3 text-sm text-gray-700">{{ $user->name }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-700">{{ $user->email }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-500">{{ $user->created_at?->format('d M Y H:i') }}</td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500">Belum ada user.</td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -90,6 +143,13 @@
 </div>
 
 <script>
+    function toggleUserList() {
+        const modal = document.getElementById('user-list-modal');
+        if (!modal) return;
+        modal.classList.toggle('hidden');
+        document.body.classList.toggle('overflow-hidden');
+    }
+
     const ctx = document.getElementById('diseaseChart').getContext('2d');
     const myChart = new Chart(ctx, {
         type: 'bar',
