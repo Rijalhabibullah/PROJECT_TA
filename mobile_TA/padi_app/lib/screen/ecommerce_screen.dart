@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/product_service.dart';
 
 class EcommerceScreen extends StatefulWidget {
   const EcommerceScreen({super.key});
@@ -10,6 +11,65 @@ class EcommerceScreen extends StatefulWidget {
 
 class _EcommerceScreenState extends State<EcommerceScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final ProductService _productService = ProductService();
+
+  List<ProductItem> _products = [];
+  List<ProductItem> _filteredProducts = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+    _searchController.addListener(_applySearch);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_applySearch);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final products = await _productService.fetchProducts();
+      setState(() {
+        _products = products;
+        _filteredProducts = products;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _applySearch() {
+    final query = _searchController.text.toLowerCase().trim();
+    if (query.isEmpty) {
+      setState(() {
+        _filteredProducts = _products;
+      });
+      return;
+    }
+
+    setState(() {
+      _filteredProducts = _products.where((product) {
+        final name = product.name.toLowerCase();
+        final description = (product.description ?? '').toLowerCase();
+        return name.contains(query) || description.contains(query);
+      }).toList();
+    });
+  }
 
   // Fungsi untuk membuka link Shopee di browser HP M2102J20SG
   Future<void> _bukaLinkShopee(String url) async {
@@ -20,74 +80,133 @@ class _EcommerceScreenState extends State<EcommerceScreen> {
   }
 
   // Fungsi Pop-up: Di sini baru kita munculkan Deskripsi Lengkap
-  void _tampilkanPopUpDetail(BuildContext context, Map<String, String> produk) {
+  void _tampilkanPopUpDetail(BuildContext context, ProductItem produk) {
+    final priceText = _formatPrice(produk.price);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Gambar di dalam pop-up (Placeholder Hitam)
-            Container(
-              width: double.infinity,
-              height: 180,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(child: Text("gambar produk", style: TextStyle(color: Colors.white))),
+        content: SizedBox(
+          width: 280,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
             ),
-            const SizedBox(height: 15),
-            Text(produk['nama']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-            const SizedBox(height: 5),
-            Text("Rp ${produk['harga']}", style: const TextStyle(color: Color(0xFF0F703A), fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 15),
-            const Divider(),
-            const Text("Deskripsi Produk:", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            Text(produk['deskripsi']!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
-          ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildDialogImage(produk.imageUrl),
+                  const SizedBox(height: 15),
+                  Text(produk.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                  const SizedBox(height: 5),
+                  Text("Rp $priceText", style: const TextStyle(color: Color(0xFF0F703A), fontWeight: FontWeight.bold, fontSize: 18)),
+                  const SizedBox(height: 15),
+                  const Divider(),
+                  const Text("Deskripsi Produk:", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  Text(produk.description ?? '-', textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
+                ],
+              ),
+            ),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Tutup", style: TextStyle(color: Color(0xFF0F703A))),
           ),
-          ElevatedButton(
-            onPressed: () => _bukaLinkShopee(produk['link']!),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F703A)),
-            child: const Text("Beli di Shopee", style: TextStyle(color: Colors.white)),
-          ),
+          if (produk.marketplaceLink != null && produk.marketplaceLink!.trim().isNotEmpty)
+            ElevatedButton(
+              onPressed: () => _bukaLinkShopee(produk.marketplaceLink!),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F703A)),
+              child: const Text("Beli di Marketplace", style: TextStyle(color: Colors.white)),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProductImage(String? imageUrl, {double height = 100, double borderRadius = 12}) {
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      return Container(
+        height: height,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.grey,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius)),
+        ),
+        child: const Center(child: Text("gambar", style: TextStyle(color: Colors.white))),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius)),
+      child: Container(
+        height: height,
+        width: double.infinity,
+        color: Colors.grey.shade200,
+        child: Image.network(
+          imageUrl,
+          height: height,
+          width: double.infinity,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: height,
+              width: double.infinity,
+              color: Colors.grey,
+              child: const Center(child: Text("gambar", style: TextStyle(color: Colors.white))),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogImage(String? imageUrl) {
+    const double height = 180;
+    const double width = 280;
+    const double radius = 10;
+
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      return Container(
+        height: height,
+        width: width,
+        decoration: BoxDecoration(
+          color: Colors.grey,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        child: const Center(child: Text("gambar", style: TextStyle(color: Colors.white))),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Container(
+        height: height,
+        width: width,
+        color: Colors.grey.shade200,
+        child: Image.network(
+          imageUrl,
+          height: height,
+          width: width,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: height,
+              width: width,
+              color: Colors.grey,
+              child: const Center(child: Text("gambar", style: TextStyle(color: Colors.white))),
+            );
+          },
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Data Dummy (Nanti diganti data dari MySQL db_rice)
-    final List<Map<String, String>> listProduk = [
-      {
-        "nama": "Pupuk Urea",
-        "harga": "75.000",
-        "deskripsi": "Pupuk urea berkualitas tinggi untuk mempercepat pertumbuhan daun dan batang padi agar lebih hijau dan kuat.",
-        "link": "https://shopee.co.id"
-      },
-      {
-        "nama": "Benih Inpari 32",
-        "harga": "120.000",
-        "deskripsi": "Benih padi varietas unggul yang tahan terhadap hawar daun bakteri dan memiliki potensi hasil yang sangat tinggi.",
-        "link": "https://shopee.co.id"
-      },
-      {
-        "nama": "Pestisida Cair",
-        "harga": "45.000",
-        "deskripsi": "Cairan pembasmi hama wereng dan ulat grayak yang efektif melindungi tanaman padi dari serangan penyakit.",
-        "link": "https://shopee.co.id"
-      },
-    ];
-
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -126,67 +245,111 @@ class _EcommerceScreenState extends State<EcommerceScreen> {
 
             // 2. Grid Produk: Nama & Harga saja - BACKROUND.png
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, // 2 kolom agar lebih rapi di HP
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: listProduk.length,
-                itemBuilder: (context, index) {
-                  final produk = listProduk[index];
-                  return Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: Column(
-                      children: [
-                        // Bagian Gambar
-                        Container(
-                          height: 100,
-                          width: double.infinity,
-                          decoration: const BoxDecoration(
-                            color: Colors.grey,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                          ),
-                          child: const Center(child: Text("gambar", style: TextStyle(color: Colors.white))),
-                        ),
-                        // Bagian Nama & Harga
-                        Padding(
-                          padding: const EdgeInsets.all(10.0),
-                          child: Column(
-                            children: [
-                              Text(produk['nama']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              const SizedBox(height: 4),
-                              Text("Rp ${produk['harga']}", style: const TextStyle(color: Color(0xFF0F703A), fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 10),
-                              // Tombol Lihat Detail (Akan munculkan Deskripsi)
-                              SizedBox(
-                                width: double.infinity,
-                                height: 35,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0F703A),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                  onPressed: () => _tampilkanPopUpDetail(context, produk),
-                                  child: const Text("Lihat Detail", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+              child: _buildProductGrid(),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildProductGrid() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_errorMessage!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: _loadProducts,
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F703A)),
+                child: const Text('Coba Lagi', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_filteredProducts.isEmpty) {
+      return const Center(child: Text('Produk belum tersedia.'));
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.68,
+      ),
+      itemCount: _filteredProducts.length,
+      itemBuilder: (context, index) {
+        final produk = _filteredProducts[index];
+        final priceText = _formatPrice(produk.price);
+        return Card(
+          elevation: 3,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Column(
+            children: [
+              _buildProductImage(produk.imageUrl, height: 120),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        produk.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      Text("Rp $priceText", style: const TextStyle(color: Color(0xFF0F703A), fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 35,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F703A),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _tampilkanPopUpDetail(context, produk),
+                          child: const Text("Lihat Detail", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatPrice(double price) {
+    final value = price.round();
+    final raw = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < raw.length; i++) {
+      final position = raw.length - i;
+      buffer.write(raw[i]);
+      if (position > 1 && position % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+    return buffer.toString();
   }
 }

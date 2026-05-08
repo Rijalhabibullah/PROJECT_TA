@@ -15,8 +15,8 @@ class ProductController extends Controller
         $request->validate([
             'name' => 'required',
             'price' => 'required|numeric',
-            'stock' => 'required|integer',
-            'image' => 'image|mimes:jpeg,png,jpg|max:2048'
+            'image' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'marketplace_link' => 'required|url|max:2048'
         ]);
 
         $imagePath = null;
@@ -28,8 +28,8 @@ class ProductController extends Controller
             'name' => $request->name,
             'description' => $request->description,
             'price' => $request->price,
-            'stock' => $request->stock,
-            'image' => $imagePath
+            'image' => $imagePath,
+            'marketplace_link' => $request->marketplace_link
         ]);
 
         return back()->with('success', 'Produk berhasil ditambahkan!');
@@ -40,5 +40,25 @@ class ProductController extends Controller
         if($product->image) Storage::disk('public')->delete($product->image);
         $product->delete();
         return back()->with('success', 'Produk dihapus!');
+    }
+
+    public function apiIndex(Request $request) {
+        $products = Product::all()->map(function ($product) {
+            $imageUrl = $product->image ? url(Storage::url($product->image)) : null;
+
+            return [
+                'id' => $product->id,
+                'name' => $product->name,
+                'description' => $product->description,
+                'price' => $product->price,
+                'image_url' => $imageUrl,
+                'marketplace_link' => $product->marketplace_link,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $products,
+        ]);
     }
 }

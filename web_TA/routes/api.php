@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ClassificationHistoryController;
+use App\Http\Controllers\ProductController;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,4 +51,7 @@ Route::prefix('classifications')->group(function () {
     // Get statistics
     Route::get('/stats/summary', [ClassificationHistoryController::class, 'stats']);
 });
+
+// Products endpoint for mobile
+Route::get('/products', [ProductController::class, 'apiIndex']);
 

@@ -9,6 +9,16 @@
 </div>
 @endif
 
+@if($errors->any())
+<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+    <ul class="list-disc list-inside">
+        @foreach($errors->all() as $error)
+            <li>{{ $error }}</li>
+        @endforeach
+    </ul>
+</div>
+@endif
+
 <div class="flex flex-col lg:flex-row gap-8">
     
     <div class="w-full lg:w-1/3">
@@ -18,28 +28,28 @@
                 @csrf
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Nama Produk</label>
-                    <input type="text" name="name" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 p-2 border" placeholder="Contoh: Urea" required>
+                    <input type="text" name="name" value="{{ old('name') }}" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 p-2 border" placeholder="Contoh: Urea" required>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Harga (Rp)</label>
-                        <input type="number" name="price" class="w-full border-gray-300 rounded-lg shadow-sm p-2 border" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Stok</label>
-                        <input type="number" name="stock" class="w-full border-gray-300 rounded-lg shadow-sm p-2 border" required>
-                    </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Harga (Rp)</label>
+                    <input type="number" name="price" value="{{ old('price') }}" class="w-full border-gray-300 rounded-lg shadow-sm p-2 border" required>
                 </div>
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
-                    <textarea name="description" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm p-2 border"></textarea>
+                    <textarea name="description" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm p-2 border">{{ old('description') }}</textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Link Marketplace</label>
+                    <input type="url" name="marketplace_link" value="{{ old('marketplace_link') }}" class="w-full border-gray-300 rounded-lg shadow-sm p-2 border" placeholder="https://shopee.co.id/..." required>
                 </div>
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Foto Produk</label>
                     <input type="file" name="image" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                    <p class="text-xs text-gray-500 mt-1">Maksimal 2 MB (jpg/png).</p>
                 </div>
 
                 <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg transition">Simpan Produk</button>
@@ -54,7 +64,6 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Info Produk</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stok</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                     </tr>
                 </thead>
@@ -76,11 +85,6 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Rp {{ number_format($product->price) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $product->stock < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800' }}">
-                                {{ $product->stock }} Unit
-                            </span>
-                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <form action="{{ route('produk.destroy', $product->id) }}" method="POST" onsubmit="return confirm('Yakin hapus?')">
                                 @csrf @method('DELETE')

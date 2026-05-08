@@ -10,7 +10,7 @@ class ClassificationService {
   // Device Fisik (WiFi): http://192.168.x.x:8000/api/classification (ganti dengan IP komputer Anda)
   // Testing Lokal: http://127.0.0.1:8000/api/classification
   // Production (ngrok): https://gobony-wedgy-cathi.ngrok-free.dev/api/classification
-  static const String _apiRoot = 'https://gobony-wedgy-cathi.ngrok-free.dev/api';
+  static const String _apiRoot = 'http://192.168.18.23:8000/api';
   static const String _baseUrl = '$_apiRoot/classification';
   static const String _historyUrl = '$_apiRoot/classifications';
   
