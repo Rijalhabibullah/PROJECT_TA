@@ -10,14 +10,12 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen bg-cover bg-center relative"
-      style="background-image: url('https://images.unsplash.com/photo-1536617621572-1d5f1e6269a0?q=80&w=2070&auto=format&fit=crop');">
+<body class="flex items-center justify-end min-h-screen bg-cover bg-center relative"
+      style="background-image: url('/images/padi.png'); background-attachment: fixed;">
 
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
-
-    <div class="relative z-10 w-full max-w-md px-6">
+    <div class="relative z-10 w-full max-w-md px-6 mr-16">
         
-        <div class="bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border border-white/50">
+        <div class="bg-white/40 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border border-white/50">
             
             <div class="pt-8 pb-6 text-center">
                 <h1 class="text-3xl font-bold text-emerald-800 mb-1">Sistem Pakar Padi</h1>
@@ -55,8 +53,8 @@
 </form>
             </div>
 
-            <div class="bg-gray-50/50 px-8 py-4 border-t border-gray-100 text-center">
-                <p class="text-xs text-gray-400">
+            <div class="bg-white/40 px-8 py-4 border-t border-gray-100 text-center">
+                <p class="text-xs text-gray-600">
                     &copy; 2025 Ahmad Rizal Habibullah
                 </p>
             </div>

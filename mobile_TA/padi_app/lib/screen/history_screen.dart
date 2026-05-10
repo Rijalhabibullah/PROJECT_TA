@@ -82,15 +82,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text('Kelas: ${item.predictedClass}'),
-                    Text('Confidence: ${item.confidence}'),
-                    Text(
-                      'Lokasi: ${item.locationAddress ?? 'Alamat tidak terdeteksi'}',
+                    _infoRow(
+                      icon: Icons.label,
+                      text: 'Kelas: ${item.predictedClass}',
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _formatTimestamp(item.createdAt),
-                      style: const TextStyle(color: Colors.black54),
+                    _infoRow(
+                      icon: Icons.bar_chart,
+                      text: 'Confidence: ${item.confidence}',
+                    ),
+                    _infoRow(
+                      icon: Icons.location_on,
+                      text:
+                          'Lokasi: ${item.locationAddress ?? 'Alamat tidak terdeteksi'}',
+                    ),
+                    _infoRow(
+                      icon: Icons.calendar_today,
+                      text: _formatTimestamp(item.createdAt),
                     ),
                   ],
                 ),
@@ -110,5 +117,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final hour = twoDigits(value.hour);
     final minute = twoDigits(value.minute);
     return '$day-$month-$year $hour:$minute';
+  }
+
+  Widget _infoRow({required IconData icon, required String text}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: Colors.black54),
+          const SizedBox(width: 6),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
   }
 }
