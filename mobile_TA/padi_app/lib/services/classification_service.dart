@@ -20,7 +20,15 @@ class ClassificationService {
       : _httpClient = httpClient ?? http.Client();
   
   /// Klasifikasi gambar dari file
-  Future<ClassificationResult> classifyImage(File imageFile) async {
+  Future<ClassificationResult> classifyImage(
+    File imageFile, {
+    String? locationAddress,
+    double? locationLat,
+    double? locationLng,
+    String? kabupaten,
+    String? kecamatan,
+    String? kelurahan,
+  }) async {
     try {
       final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/classify'));
       request.headers['Accept'] = 'application/json';
@@ -38,6 +46,25 @@ class ClassificationService {
       request.files.add(
         await http.MultipartFile.fromPath('image', imageFile.path),
       );
+      
+      if (locationAddress != null && locationAddress.isNotEmpty) {
+        request.fields['location_address'] = locationAddress;
+      }
+      if (locationLat != null) {
+        request.fields['location_lat'] = locationLat.toString();
+      }
+      if (locationLng != null) {
+        request.fields['location_lng'] = locationLng.toString();
+      }
+      if (kabupaten != null && kabupaten.isNotEmpty) {
+        request.fields['kabupaten'] = kabupaten;
+      }
+      if (kecamatan != null && kecamatan.isNotEmpty) {
+        request.fields['kecamatan'] = kecamatan;
+      }
+      if (kelurahan != null && kelurahan.isNotEmpty) {
+        request.fields['kelurahan'] = kelurahan;
+      }
       
       final response = await request.send().timeout(
         const Duration(seconds: 30),
@@ -87,6 +114,9 @@ class ClassificationService {
     String? locationAddress,
     double? locationLat,
     double? locationLng,
+    String? kabupaten,
+    String? kecamatan,
+    String? kelurahan,
   }) async {
     try {
       final request = http.MultipartRequest(
@@ -117,6 +147,15 @@ class ClassificationService {
       }
       if (locationLng != null) {
         request.fields['location_lng'] = locationLng.toString();
+      }
+      if (kabupaten != null && kabupaten.isNotEmpty) {
+        request.fields['kabupaten'] = kabupaten;
+      }
+      if (kecamatan != null && kecamatan.isNotEmpty) {
+        request.fields['kecamatan'] = kecamatan;
+      }
+      if (kelurahan != null && kelurahan.isNotEmpty) {
+        request.fields['kelurahan'] = kelurahan;
       }
       
       final response = await request.send().timeout(
@@ -214,6 +253,10 @@ class ClassificationResult {
   final DiseaseInfo diseaseInfo;
   final String? imagePath;
   final String? notes;
+  final String? locationAddress;
+  final String? kabupaten;
+  final String? kecamatan;
+  final String? kelurahan;
   final DateTime timestamp;
   
   ClassificationResult({
@@ -225,6 +268,10 @@ class ClassificationResult {
     required this.timestamp,
     this.imagePath,
     this.notes,
+    this.locationAddress,
+    this.kabupaten,
+    this.kecamatan,
+    this.kelurahan,
   });
   
   factory ClassificationResult.fromJson(Map<String, dynamic> json) {
@@ -240,6 +287,10 @@ class ClassificationResult {
       ),
       imagePath: json['image_path'],
       notes: json['notes'],
+      locationAddress: json['location_address'],
+      kabupaten: json['kabupaten'],
+      kecamatan: json['kecamatan'],
+      kelurahan: json['kelurahan'],
       timestamp: DateTime.parse(
         json['timestamp'] ?? DateTime.now().toIso8601String(),
       ),
@@ -283,6 +334,9 @@ class ClassificationHistoryItem {
   final String? locationAddress;
   final double? locationLat;
   final double? locationLng;
+  final String? kabupaten;
+  final String? kecamatan;
+  final String? kelurahan;
   final DateTime createdAt;
 
   ClassificationHistoryItem({
@@ -296,6 +350,9 @@ class ClassificationHistoryItem {
     this.locationAddress,
     this.locationLat,
     this.locationLng,
+    this.kabupaten,
+    this.kecamatan,
+    this.kelurahan,
   });
 
   factory ClassificationHistoryItem.fromJson(Map<String, dynamic> json) {
@@ -320,6 +377,9 @@ class ClassificationHistoryItem {
       locationAddress: json['location_address'],
       locationLat: locationLat,
       locationLng: locationLng,
+      kabupaten: json['kabupaten'],
+      kecamatan: json['kecamatan'],
+      kelurahan: json['kelurahan'],
       createdAt: DateTime.parse(
         json['created_at'] ?? DateTime.now().toIso8601String(),
       ),

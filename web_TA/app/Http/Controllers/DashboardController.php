@@ -30,13 +30,31 @@ class DashboardController extends Controller
         $totalUsers = User::count();
         $recentUsers = User::orderByDesc('created_at')->take(10)->get();
         
+        // Statistik penyakit per kabupaten
+        $diseaseByKabupaten = \App\Models\Classification::selectRaw('kabupaten, predicted_class, count(*) as total')
+            ->whereNotNull('kabupaten')
+            ->groupBy('kabupaten', 'predicted_class')
+            ->orderBy('kabupaten')
+            ->orderByDesc('total')
+            ->get();
+        
+        // Format data untuk chart
+        $kabupatenDiseaseData = [];
+        foreach ($diseaseByKabupaten as $record) {
+            if (!isset($kabupatenDiseaseData[$record->kabupaten])) {
+                $kabupatenDiseaseData[$record->kabupaten] = [];
+            }
+            $kabupatenDiseaseData[$record->kabupaten][$record->predicted_class] = $record->total;
+        }
+
         return view('dashboard', compact(
             'totalDataset',
             'diseaseStats',
             'mostCommonDisease',
             'totalProducts',
             'totalUsers',
-            'recentUsers'
+            'recentUsers',
+            'kabupatenDiseaseData'
         ));
     }
 }

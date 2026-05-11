@@ -32,6 +32,9 @@ class ClassificationController extends Controller
                 'location_address' => 'nullable|string|max:255',
                 'location_lat' => 'nullable|numeric',
                 'location_lng' => 'nullable|numeric',
+                'kabupaten' => 'nullable|string|max:255',
+                'kecamatan' => 'nullable|string|max:255',
+                'kelurahan' => 'nullable|string|max:255',
             ]);
 
             // Ambil file gambar
@@ -67,6 +70,15 @@ class ClassificationController extends Controller
             // Tambahkan informasi detail tentang penyakit
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
+            // Extract location components from address if not provided
+            $locationAddress = $request->input('location_address');
+            $locationLat = $request->input('location_lat');
+            $locationLng = $request->input('location_lng');
+            $locationComponents = $this->extractLocationComponents($locationAddress, $locationLat, $locationLng);
+            $kabupaten = $request->input('kabupaten') ?? $locationComponents['kabupaten'];
+            $kecamatan = $request->input('kecamatan') ?? $locationComponents['kecamatan'];
+            $kelurahan = $request->input('kelurahan') ?? $locationComponents['kelurahan'];
+
             $savedToDatabase = true;
             $persistenceWarning = null;
 
@@ -80,12 +92,12 @@ class ClassificationController extends Controller
                     'disease_name' => $diseaseInfo['name'],
                     'severity' => $diseaseInfo['severity'],
                     'notes' => 'Classification without storage',
-                    'location_address' => $request->input('location_address'),
-                    'location_lat' => $request->input('location_lat'),
-                    'location_lng' => $request->input('location_lng'),
-                    'location_address' => $request->input('location_address'),
-                    'location_lat' => $request->input('location_lat'),
-                    'location_lng' => $request->input('location_lng'),
+                    'location_address' => $locationAddress,
+                    'location_lat' => $locationLat,
+                    'location_lng' => $locationLng,
+                    'kabupaten' => $kabupaten,
+                    'kecamatan' => $kecamatan,
+                    'kelurahan' => $kelurahan,
                 ]);
             } catch (\Throwable $dbException) {
                 $savedToDatabase = false;
@@ -141,6 +153,9 @@ class ClassificationController extends Controller
                 'location_address' => 'nullable|string|max:255',
                 'location_lat' => 'nullable|numeric',
                 'location_lng' => 'nullable|numeric',
+                'kabupaten' => 'nullable|string|max:255',
+                'kecamatan' => 'nullable|string|max:255',
+                'kelurahan' => 'nullable|string|max:255',
             ]);
 
             // Simpan gambar
@@ -194,6 +209,15 @@ class ClassificationController extends Controller
 
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
+            // Extract location components from address if not provided
+            $locationAddress = $request->input('location_address');
+            $locationLat = $request->input('location_lat');
+            $locationLng = $request->input('location_lng');
+            $locationComponents = $this->extractLocationComponents($locationAddress, $locationLat, $locationLng);
+            $kabupaten = $request->input('kabupaten') ?? $locationComponents['kabupaten'];
+            $kecamatan = $request->input('kecamatan') ?? $locationComponents['kecamatan'];
+            $kelurahan = $request->input('kelurahan') ?? $locationComponents['kelurahan'];
+
             $savedToDatabase = true;
             $persistenceWarning = null;
 
@@ -208,9 +232,12 @@ class ClassificationController extends Controller
                     'disease_name' => $diseaseInfo['name'],
                     'severity' => $diseaseInfo['severity'],
                     'notes' => $request->input('notes'),
-                    'location_address' => $request->input('location_address'),
-                    'location_lat' => $request->input('location_lat'),
-                    'location_lng' => $request->input('location_lng'),
+                    'location_address' => $locationAddress,
+                    'location_lat' => $locationLat,
+                    'location_lng' => $locationLng,
+                    'kabupaten' => $kabupaten,
+                    'kecamatan' => $kecamatan,
+                    'kelurahan' => $kelurahan,
                 ]);
             } catch (\Throwable $dbException) {
                 $savedToDatabase = false;
@@ -257,9 +284,12 @@ class ClassificationController extends Controller
                     ClassificationHistory::create([
                         'user_id' => $historyUserId,
                         'jenis_penyakit' => $diseaseInfo['name'] ?? $result['predicted_class'],
-                        'location_address' => $request->input('location_address'),
+                        'location_address' => $locationAddress,
                         'location_lat' => $request->input('location_lat'),
                         'location_lng' => $request->input('location_lng'),
+                        'kabupaten' => $kabupaten,
+                        'kecamatan' => $kecamatan,
+                        'kelurahan' => $kelurahan,
                     ]);
                 } catch (\Throwable $historyException) {
                     Log::warning('Classification history not persisted', [
@@ -441,6 +471,57 @@ class ClassificationController extends Controller
     public function testConnection()
     {
         return $this->health();
+    }
+
+    /**
+     * Extract kabupaten, kecamatan, kelurahan dari location_address string
+     * Format Indonesia: "Kelurahan, Kecamatan ..., Kabupaten ..., Provinsi, Negara"
+     * Contoh: "Sumbersari, Kecamatan Sumbersari, Kabupaten Jember, Jawa Timur, Indonesia"
+     */
+    private function extractLocationComponents($locationAddress, $lat = null, $lng = null)
+    {
+        $components = [
+            'kabupaten' => null,
+            'kecamatan' => null,
+            'kelurahan' => null,
+        ];
+
+        if (!$locationAddress) {
+            return $components;
+        }
+
+        // Extract "Kabupaten [name]" atau "Kota [name]"
+        if (preg_match('/(?:Kabupaten|Kota)\s+([^,]+)/', $locationAddress, $matches)) {
+            $components['kabupaten'] = trim($matches[1]);
+        }
+
+        // Extract "Kecamatan [name]"
+        if (preg_match('/Kecamatan\s+([^,]+)/', $locationAddress, $matches)) {
+            $components['kecamatan'] = trim($matches[1]);
+        }
+
+        // Extract first part (before first comma) as kelurahan
+        $parts = explode(',', $locationAddress);
+        if (!empty($parts)) {
+            $kelurahan = trim($parts[0]);
+            if ($kelurahan && !preg_match('/^(Kecamatan|Kabupaten|Kota|Provinsi)/', $kelurahan)) {
+                $components['kelurahan'] = $kelurahan;
+            }
+        }
+
+        // Fallback: If kabupaten not found in address, use lat/lng to determine it
+        // For Jember area (coordinates around -8.1656155, 113.7212891)
+        if (!$components['kabupaten'] && $lat && $lng) {
+            $lat = (float) $lat;
+            $lng = (float) $lng;
+            
+            // Jember region boundaries (approximate)
+            if ($lat >= -8.35 && $lat <= -7.85 && $lng >= 113.50 && $lng <= 114.00) {
+                $components['kabupaten'] = 'Jember';
+            }
+        }
+
+        return $components;
     }
 
     /**

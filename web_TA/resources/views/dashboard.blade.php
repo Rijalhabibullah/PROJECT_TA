@@ -222,4 +222,56 @@
     });
 </script>
 
+<!-- Statistik Penyakit Per Kabupaten -->
+<div class="mt-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+    <h3 class="text-lg font-bold text-gray-800 mb-4">🗺️ Distribusi Penyakit Per Kabupaten</h3>
+    
+    @if(count($kabupatenDiseaseData) > 0)
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Kabupaten</th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Bacterial Blight</th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Brown Spot</th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Leaf Smut</th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Total</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                @foreach($kabupatenDiseaseData as $kabupaten => $diseases)
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-800">{{ $kabupaten ?? 'Tidak Diketahui' }}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex items-center justify-center px-3 py-1 text-sm font-bold text-blue-700 bg-blue-100 rounded-lg">
+                            {{ $diseases['Bacterialblight'] ?? 0 }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex items-center justify-center px-3 py-1 text-sm font-bold text-orange-700 bg-orange-100 rounded-lg">
+                            {{ $diseases['Brownspot'] ?? 0 }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex items-center justify-center px-3 py-1 text-sm font-bold text-yellow-700 bg-yellow-100 rounded-lg">
+                            {{ $diseases['Leafsmut'] ?? 0 }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex items-center justify-center px-3 py-1 text-sm font-bold text-gray-700 bg-gray-200 rounded-lg">
+                            {{ array_sum($diseases) }}
+                        </span>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    @else
+    <div class="text-center py-8">
+        <p class="text-gray-500 text-sm">Belum ada data klasifikasi dengan informasi kabupaten</p>
+    </div>
+    @endif
+</div>
+
 @endsection

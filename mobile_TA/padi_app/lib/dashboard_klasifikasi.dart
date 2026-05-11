@@ -106,6 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
         locationAddress: location?.address,
         locationLat: location?.lat,
         locationLng: location?.lng,
+        kabupaten: location?.kabupaten,
+        kecamatan: location?.kecamatan,
+        kelurahan: location?.kelurahan,
       );
 
       // Validasi: cek apakah confidence cukup tinggi (artinya itu daun padi)
@@ -177,20 +180,43 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     String? address;
+    String? kabupaten;
+    String? kecamatan;
+    String? kelurahan;
+    
     if (placemarks.isNotEmpty) {
       final place = placemarks.first;
+      
+      // Extract components dengan urutan yang sesuai untuk Indonesia
+      kelurahan = place.subLocality?.trim(); // Kelurahan/Desa
+      kecamatan = place.locality?.trim(); // Kecamatan
+      
+      final provinsi = place.administrativeArea?.trim(); // Provinsi
+      final negara = place.country?.trim(); // Negara
+      
+      // Build full address: kelurahan, kecamatan, kabupaten, provinsi, negara
+      // Note: subAdministrativeArea (kabupaten) tidak selalu tersedia di geocoding Indonesia
       final parts = [
-        place.street,
-        place.subLocality,
-        place.locality,
-        place.administrativeArea,
-        place.country,
-      ].where((part) => part != null && part!.trim().isNotEmpty)
-          .map((part) => part!.trim())
+        kelurahan,
+        kecamatan,
+        provinsi,
+        negara,
+      ].where((part) => part != null && part!.isNotEmpty)
           .toList();
 
       if (parts.isNotEmpty) {
         address = parts.join(', ');
+      }
+      
+      // Extract kabupaten dari location_address jika ada (Indonesia format)
+      // Contoh: "Sumbersari, Kecamatan Sumbersari, Kabupaten Jember, Jawa Timur, Indonesia"
+      if (address != null) {
+        // Try extract "Kabupaten [name]" atau "Kota [name]"
+        final kabupatenRegex = RegExp(r'(?:Kabupaten|Kota)\s+([^,]+)');
+        final kabupatenMatch = kabupatenRegex.firstMatch(address!);
+        if (kabupatenMatch != null) {
+          kabupaten = kabupatenMatch.group(1)?.trim();
+        }
       }
     }
 
@@ -205,6 +231,9 @@ class _HomeScreenState extends State<HomeScreen> {
       address: address,
       lat: position.latitude,
       lng: position.longitude,
+      kabupaten: kabupaten,
+      kecamatan: kecamatan,
+      kelurahan: kelurahan,
     );
   }
 
@@ -414,10 +443,16 @@ class _LocationPayload {
   final String? address;
   final double lat;
   final double lng;
+  final String? kabupaten;
+  final String? kecamatan;
+  final String? kelurahan;
 
   const _LocationPayload({
     required this.address,
     required this.lat,
     required this.lng,
+    this.kabupaten,
+    this.kecamatan,
+    this.kelurahan,
   });
 }

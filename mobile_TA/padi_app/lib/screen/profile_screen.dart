@@ -15,6 +15,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userEmail = "";
   String _userPhone = "";
   String _userLocation = "";
+  String _userKabupaten = "";
+  String _userKecamatan = "";
+  String _userKelurahan = "";
 
   @override
   void initState() {
@@ -30,6 +33,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _userEmail = prefs.getString('user_email') ?? '';
       _userPhone = prefs.getString('user_phone') ?? '';
       _userLocation = prefs.getString('user_location') ?? '';
+      _userKabupaten = prefs.getString('user_kabupaten') ?? '';
+      _userKecamatan = prefs.getString('user_kecamatan') ?? '';
+      _userKelurahan = prefs.getString('user_kelurahan') ?? '';
     });
   }
 
@@ -82,26 +88,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final place = placemarks.first;
+    
+    // Extract components dengan urutan yang sesuai untuk Indonesia
+    final kelurahan = place.subLocality?.trim(); // Kelurahan/Desa
+    final kecamatan = place.locality?.trim(); // Kecamatan
+    final provinsi = place.administrativeArea?.trim(); // Provinsi
+    final negara = place.country?.trim(); // Negara
+    
+    // Build full address: kelurahan, kecamatan, kabupaten, provinsi, negara
     final parts = [
-      place.street,
-      place.subLocality,
-      place.locality,
-      place.administrativeArea,
-      place.country,
-    ].where((part) => part != null && part!.trim().isNotEmpty)
-        .map((part) => part!.trim())
+      kelurahan,
+      kecamatan,
+      provinsi,
+      negara,
+    ].where((part) => part != null && part!.isNotEmpty)
         .toList();
 
     if (parts.isEmpty) {
       return null;
     }
 
-    return parts.join(', ');
+    final address = parts.join(', ');
+    
+    // Extract kabupaten dari address jika ada (Indonesia format)
+    // Contoh: "Sumbersari, Kecamatan Sumbersari, Kabupaten Jember, Jawa Timur, Indonesia"
+    String? kabupaten;
+    final kabupatenRegex = RegExp(r'(?:Kabupaten|Kota)\s+([^,]+)');
+    final kabupatenMatch = kabupatenRegex.firstMatch(address);
+    if (kabupatenMatch != null) {
+      kabupaten = kabupatenMatch.group(1)?.trim();
+    }
+
+    // Save to shared preferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_location', address);
+    if (kelurahan != null) await prefs.setString('user_kelurahan', kelurahan);
+    if (kecamatan != null) await prefs.setString('user_kecamatan', kecamatan);
+    if (kabupaten != null) await prefs.setString('user_kabupaten', kabupaten);
+
+    return address;
   }
 
   void _openEditProfile() {
     final phoneController = TextEditingController(text: _userPhone);
     final locationController = TextEditingController(text: _userLocation);
+    final kabupatenController = TextEditingController(text: _userKabupaten);
+    final kecamatanController = TextEditingController(text: _userKecamatan);
+    final kelurahanController = TextEditingController(text: _userKelurahan);
 
     showModalBottomSheet(
       context: context,
@@ -142,6 +175,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: kabupatenController,
+                decoration: const InputDecoration(
+                  labelText: 'Kabupaten',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: kecamatanController,
+                decoration: const InputDecoration(
+                  labelText: 'Kecamatan',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: kelurahanController,
+                decoration: const InputDecoration(
+                  labelText: 'Kelurahan',
+                  border: OutlineInputBorder(),
+                ),
+              ),
               const SizedBox(height: 10),
               TextButton.icon(
                 onPressed: () async {
@@ -157,6 +214,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     return;
                   }
                   locationController.text = address;
+                  
+                  // Load saved values from prefs
+                  final prefs = await SharedPreferences.getInstance();
+                  kabupatenController.text = prefs.getString('user_kabupaten') ?? '';
+                  kecamatanController.text = prefs.getString('user_kecamatan') ?? '';
+                  kelurahanController.text = prefs.getString('user_kelurahan') ?? '';
                 },
                 icon: const Icon(Icons.my_location),
                 label: const Text('Gunakan lokasi saat ini'),
@@ -176,11 +239,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           'user_location',
                           locationController.text.trim(),
                         );
+                        await prefs.setString(
+                          'user_kabupaten',
+                          kabupatenController.text.trim(),
+                        );
+                        await prefs.setString(
+                          'user_kecamatan',
+                          kecamatanController.text.trim(),
+                        );
+                        await prefs.setString(
+                          'user_kelurahan',
+                          kelurahanController.text.trim(),
+                        );
 
                         if (mounted) {
                           setState(() {
                             _userPhone = phoneController.text.trim();
                             _userLocation = locationController.text.trim();
+                            _userKabupaten = kabupatenController.text.trim();
+                            _userKecamatan = kecamatanController.text.trim();
+                            _userKelurahan = kelurahanController.text.trim();
                           });
                         }
 
@@ -225,6 +303,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               await prefs.remove('user_email');
               await prefs.remove('user_phone');
               await prefs.remove('user_location');
+              await prefs.remove('user_kabupaten');
+              await prefs.remove('user_kecamatan');
+              await prefs.remove('user_kelurahan');
               if (mounted) {
                 Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
               }
@@ -330,9 +411,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Divider(height: 20),
                   _buildProfileField(
                     icon: Icons.location_on,
-                    label: "Lokasi",
+                    label: "Lokasi Lengkap",
                     value: _userLocation,
-                    placeholder: 'Tambahkan lokasi',
+                    placeholder: 'Lokasi lengkap',
                     maxLines: 3,
                   ),
                 ],

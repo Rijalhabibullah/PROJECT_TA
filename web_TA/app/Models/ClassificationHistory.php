@@ -16,6 +16,9 @@ class ClassificationHistory extends Model
         'location_address',
         'location_lat',
         'location_lng',
+        'kabupaten',
+        'kecamatan',
+        'kelurahan',
     ];
 
     protected $casts = [
