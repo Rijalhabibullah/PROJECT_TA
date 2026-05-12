@@ -106,7 +106,7 @@
 </div>
 
 <!-- Grafik dan Detail Penyakit -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
     
     <!-- Grafik Distribusi Penyakit -->
     <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -115,6 +115,19 @@
             <canvas id="diseaseChart"></canvas>
         </div>
         <p class="text-xs text-gray-500 mt-4">Diagram menunjukkan jumlah citra setiap jenis penyakit yang tersimpan di database untuk training AI</p>
+    </div>
+
+    <!-- Pie Chart User Terbanyak Per Kabupaten -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">👥 User Terbanyak per Kabupaten</h3>
+        @if($usersByKabupaten->count() > 0)
+            <div class="h-56 md:h-64">
+                <canvas id="userKabupatenPie"></canvas>
+            </div>
+            <p class="text-xs text-gray-500 mt-4">Persentase user berdasarkan kabupaten (dari data klasifikasi)</p>
+        @else
+            <p class="text-gray-500 text-sm">Belum ada data user per kabupaten.</p>
+        @endif
     </div>
 
     <!-- Daftar Detail Penyakit -->
@@ -220,6 +233,57 @@
             }
         }
     });
+
+    @if($usersByKabupaten->count() > 0)
+    const pieCtx = document.getElementById('userKabupatenPie').getContext('2d');
+    const userKabupatenData = [
+        @foreach($usersByKabupaten as $row)
+            {{ $row->total_users }},
+        @endforeach
+    ];
+    const userKabupatenLabels = [
+        @foreach($usersByKabupaten as $row)
+            '{{ $row->kabupaten }}',
+        @endforeach
+    ];
+
+    new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+            labels: userKabupatenLabels,
+            datasets: [{
+                data: userKabupatenData,
+                backgroundColor: [
+                    '#10B981',
+                    '#3B82F6',
+                    '#F59E0B',
+                    '#EF4444',
+                    '#8B5CF6',
+                    '#22C55E',
+                    '#14B8A6',
+                    '#F97316'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = userKabupatenData.reduce((a, b) => a + b, 0);
+                            const value = context.parsed;
+                            const percentage = total ? ((value / total) * 100).toFixed(1) : 0;
+                            return context.label + ': ' + value + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    @endif
 </script>
 
 <!-- Statistik Penyakit Per Kabupaten -->

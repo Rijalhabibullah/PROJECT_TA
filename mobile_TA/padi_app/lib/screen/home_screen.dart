@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../utils/image_compress.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,8 +20,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final pickedFile = await _picker.pickImage(source: source);
 
     if (pickedFile != null) {
+      final compressed = await compressImageFile(File(pickedFile.path));
       setState(() {
-        _image = File(pickedFile.path);
+        _image = compressed;
       });
     }
   }

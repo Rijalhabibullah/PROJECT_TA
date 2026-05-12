@@ -40,7 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _tryAutoFillLocation() async {
-    if (_userLocation.isNotEmpty) {
+    if (_userLocation.isNotEmpty && _userKabupaten.isNotEmpty) {
       return;
     }
 
@@ -51,12 +51,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_location', address);
+
     if (mounted) {
       setState(() {
         _userLocation = address;
+        // Load all location details from prefs
+        _userKabupaten = prefs.getString('user_kabupaten') ?? '';
+        _userKecamatan = prefs.getString('user_kecamatan') ?? '';
+        _userKelurahan = prefs.getString('user_kelurahan') ?? '';
       });
     }
   }
+
+  // Daftar Kabupaten/Kota di Indonesia (mapping Kecamatan -> Kabupaten)
+  final Map<String, String> _districtToRegencyMap = {
+    // Jawa Timur - Jember
+    'Sumbersari': 'Kabupaten Jember',
+    'Ambulu': 'Kabupaten Jember',
+    'Ajung': 'Kabupaten Jember',
+    'Mayang': 'Kabupaten Jember',
+    'Mumbulsari': 'Kabupaten Jember',
+    'Kalisat': 'Kabupaten Jember',
+    'Jenggawah': 'Kabupaten Jember',
+    'Sukorambi': 'Kabupaten Jember',
+    'Rambipuji': 'Kabupaten Jember',
+    'Silo': 'Kabupaten Jember',
+    'Kencong': 'Kabupaten Jember',
+    'Puger': 'Kabupaten Jember',
+    'Wuluhan': 'Kabupaten Jember',
+    'Tempeh': 'Kabupaten Jember',
+    'Ledokombo': 'Kabupaten Jember',
+    'Panti': 'Kabupaten Jember',
+    'Pakusari': 'Kabupaten Jember',
+    'Tanggul': 'Kabupaten Jember',
+    
+    // Jawa Timur - Surabaya
+    'Surabaya': 'Kota Surabaya',
+    'Gubeng': 'Kota Surabaya',
+    'Rungkut': 'Kota Surabaya',
+    
+    // Jawa Timur - Malang
+    'Malang': 'Kota Malang',
+    
+    // Jawa Timur - Batu
+    'Batu': 'Kota Batu',
+    
+    // Jawa Tengah - Semarang
+    'Semarang': 'Kota Semarang',
+    
+    // Jawa Barat - Bandung
+    'Bandung': 'Kota Bandung',
+    
+    // Tambahkan mapping untuk kabupaten/kota lain sesuai kebutuhan
+  };
 
   Future<String?> _fetchCurrentAddress() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -91,40 +138,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     // Extract components dengan urutan yang sesuai untuk Indonesia
     final kelurahan = place.subLocality?.trim(); // Kelurahan/Desa
-    final kecamatan = place.locality?.trim(); // Kecamatan
+    final kecamatan = place.locality?.trim(); // Kecamatan/Kota
     final provinsi = place.administrativeArea?.trim(); // Provinsi
     final negara = place.country?.trim(); // Negara
     
-    // Build full address: kelurahan, kecamatan, kabupaten, provinsi, negara
-    final parts = [
+    // Extract kabupaten - try multiple sources
+    String? kabupaten;
+    
+    // Method 1: Try subAdministrativeArea first (most reliable)
+    if (place.subAdministrativeArea != null && place.subAdministrativeArea!.isNotEmpty) {
+      kabupaten = place.subAdministrativeArea!.trim();
+    }
+    
+    // Method 2: Try to find in thoroughfare
+    if (kabupaten == null && place.thoroughfare != null && place.thoroughfare!.isNotEmpty) {
+      final match = RegExp(r'(?:Kabupaten|Kota)\s+([^,]+)').firstMatch(place.thoroughfare!);
+      if (match != null) {
+        kabupaten = match.group(1)?.trim();
+      }
+    }
+    
+    // Method 3: Use mapping dictionary based on kecamatan
+    if (kabupaten == null && kecamatan != null) {
+      kabupaten = _districtToRegencyMap[kecamatan];
+    }
+
+    if (kabupaten != null &&
+        !kabupaten.contains('Kabupaten') &&
+        !kabupaten.contains('Kota')) {
+      kabupaten = 'Kabupaten $kabupaten';
+    }
+    
+    // Build address
+    final addressParts = [
       kelurahan,
       kecamatan,
+      kabupaten,
       provinsi,
       negara,
     ].where((part) => part != null && part!.isNotEmpty)
         .toList();
 
-    if (parts.isEmpty) {
+    if (addressParts.isEmpty) {
       return null;
     }
 
-    final address = parts.join(', ');
-    
-    // Extract kabupaten dari address jika ada (Indonesia format)
-    // Contoh: "Sumbersari, Kecamatan Sumbersari, Kabupaten Jember, Jawa Timur, Indonesia"
-    String? kabupaten;
-    final kabupatenRegex = RegExp(r'(?:Kabupaten|Kota)\s+([^,]+)');
-    final kabupatenMatch = kabupatenRegex.firstMatch(address);
-    if (kabupatenMatch != null) {
-      kabupaten = kabupatenMatch.group(1)?.trim();
-    }
+    final address = addressParts.join(', ');
 
     // Save to shared preferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_location', address);
     if (kelurahan != null) await prefs.setString('user_kelurahan', kelurahan);
     if (kecamatan != null) await prefs.setString('user_kecamatan', kecamatan);
-    if (kabupaten != null) await prefs.setString('user_kabupaten', kabupaten);
+    if (kabupaten != null) {
+      await prefs.setString('user_kabupaten', kabupaten);
+    } else if (provinsi != null) {
+      // Default: use provinsi jika kabupaten tidak ditemukan
+      await prefs.setString('user_kabupaten', provinsi);
+    }
 
     return address;
   }

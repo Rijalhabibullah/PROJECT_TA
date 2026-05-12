@@ -33,6 +33,10 @@ class DashboardController extends Controller
         // Statistik penyakit per kabupaten
         $diseaseByKabupaten = \App\Models\Classification::selectRaw('kabupaten, predicted_class, count(*) as total')
             ->whereNotNull('kabupaten')
+            ->where(function ($query) {
+                $query->where('kabupaten', 'like', 'Kabupaten %')
+                    ->orWhere('kabupaten', 'like', 'Kota %');
+            })
             ->groupBy('kabupaten', 'predicted_class')
             ->orderBy('kabupaten')
             ->orderByDesc('total')
@@ -47,6 +51,18 @@ class DashboardController extends Controller
             $kabupatenDiseaseData[$record->kabupaten][$record->predicted_class] = $record->total;
         }
 
+        // Statistik user terbanyak per kabupaten (berdasarkan klasifikasi)
+        $usersByKabupaten = \App\Models\Classification::selectRaw('kabupaten, count(distinct user_id) as total_users')
+            ->whereNotNull('kabupaten')
+            ->whereNotNull('user_id')
+            ->where(function ($query) {
+                $query->where('kabupaten', 'like', 'Kabupaten %')
+                    ->orWhere('kabupaten', 'like', 'Kota %');
+            })
+            ->groupBy('kabupaten')
+            ->orderByDesc('total_users')
+            ->get();
+
         return view('dashboard', compact(
             'totalDataset',
             'diseaseStats',
@@ -54,7 +70,8 @@ class DashboardController extends Controller
             'totalProducts',
             'totalUsers',
             'recentUsers',
-            'kabupatenDiseaseData'
+            'kabupatenDiseaseData',
+            'usersByKabupaten'
         ));
     }
 }
