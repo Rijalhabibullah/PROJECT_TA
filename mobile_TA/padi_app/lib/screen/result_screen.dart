@@ -454,7 +454,7 @@ class _ResultScreenState extends State<ResultScreen> {
                   
                   // Harga
                   Text(
-                    'Rp ${product.price.toStringAsFixed(0)}',
+                    'Rp ${_formatPrice(product.price)}',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -498,20 +498,48 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<void> _launchUrl(String urlString) async {
-    final Uri url = Uri.parse(urlString);
+    final String trimmed = urlString.trim();
+    if (trimmed.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link kosong')),
+      );
+      return;
+    }
+
+    final Uri? parsed = Uri.tryParse(trimmed);
+    final Uri url = (parsed != null && parsed.hasScheme)
+        ? parsed
+        : Uri.parse('https://$trimmed');
+
     try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka link')),
-        );
+      final bool opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!opened) {
+        final bool fallbackOpened = await launchUrl(url, mode: LaunchMode.platformDefault);
+        if (!fallbackOpened) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tidak dapat membuka link')),
+          );
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
     }
+  }
+
+  String _formatPrice(double price) {
+    final value = price.round();
+    final raw = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < raw.length; i++) {
+      final position = raw.length - i;
+      buffer.write(raw[i]);
+      if (position > 1 && position % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+    return buffer.toString();
   }
 
   void _showDetailPopup(BuildContext context) {

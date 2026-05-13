@@ -41,7 +41,7 @@ class ProductItem {
 
 class ProductService {
   // Samakan dengan API root di classification_service.dart
-  static const String _apiRoot = 'http://192.168.18.23:8000/api';
+  static const String _apiRoot = 'https://gobony-wedgy-cathi.ngrok-free.dev/api';
   static const String _productsUrl = '$_apiRoot/products';
 
   final http.Client _httpClient;
