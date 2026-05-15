@@ -12,12 +12,51 @@ class ProductController extends Controller
         return view('admin.products.index', compact('products'));
     }
 
+    public function edit(Product $product) {
+        return view('admin.products.edit', compact('product'));
+    }
+
+    public function update(Request $request, Product $product) {
+        $request->validate([
+            'name' => 'required',
+            'price' => 'required|numeric',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'marketplace_link' => 'required|url|max:2048',
+            'disease_tag' => 'nullable|string|max:50'
+        ]);
+
+        $imagePath = $product->image;
+        if ($request->hasFile('image')) {
+            $newPath = $this->compressAndStoreProductImage($request->file('image'))
+                ?? $request->file('image')->store('products', 'public');
+
+            if ($newPath) {
+                if ($imagePath) {
+                    Storage::disk('public')->delete($imagePath);
+                }
+                $imagePath = $newPath;
+            }
+        }
+
+        $product->update([
+            'name' => $request->name,
+            'description' => $request->description,
+            'price' => $request->price,
+            'image' => $imagePath,
+            'marketplace_link' => $request->marketplace_link,
+            'disease_tag' => $request->disease_tag ?: null
+        ]);
+
+        return redirect()->route('produk.index')->with('success', 'Produk berhasil diperbarui!');
+    }
+
     public function store(Request $request) {
         $request->validate([
             'name' => 'required',
             'price' => 'required|numeric',
             'image' => 'image|mimes:jpeg,png,jpg|max:2048',
-            'marketplace_link' => 'required|url|max:2048'
+            'marketplace_link' => 'required|url|max:2048',
+            'disease_tag' => 'nullable|string|max:50'
         ]);
 
         $imagePath = null;
@@ -31,7 +70,8 @@ class ProductController extends Controller
             'description' => $request->description,
             'price' => $request->price,
             'image' => $imagePath,
-            'marketplace_link' => $request->marketplace_link
+            'marketplace_link' => $request->marketplace_link,
+            'disease_tag' => $request->disease_tag ?: null
         ]);
 
         return back()->with('success', 'Produk berhasil ditambahkan!');
@@ -55,6 +95,7 @@ class ProductController extends Controller
                 'price' => $product->price,
                 'image_url' => $imageUrl,
                 'marketplace_link' => $product->marketplace_link,
+                'disease_tag' => $product->disease_tag,
             ];
         });
 

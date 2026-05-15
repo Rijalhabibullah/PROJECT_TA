@@ -9,6 +9,7 @@ class ProductItem {
   final double price;
   final String? imageUrl;
   final String? marketplaceLink;
+  final String? diseaseTag;
 
   ProductItem({
     required this.id,
@@ -17,6 +18,7 @@ class ProductItem {
     this.description,
     this.imageUrl,
     this.marketplaceLink,
+    this.diseaseTag,
   });
 
   factory ProductItem.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class ProductItem {
       price: priceValue,
       imageUrl: json['image_url'],
       marketplaceLink: json['marketplace_link'],
+      diseaseTag: json['disease_tag'],
     );
   }
 }

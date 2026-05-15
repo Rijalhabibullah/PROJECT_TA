@@ -210,7 +210,7 @@ class ClassificationService {
 
       final response = await _httpClient
           .get(
-            Uri.parse('$_historyUrl?page=$page$userParam'),
+            Uri.parse('$_historyUrl?page=$page&per_page=1000$userParam'),
             headers: {'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 15));
@@ -278,7 +278,9 @@ class ClassificationResult {
     return ClassificationResult(
       predictedClass: json['predicted_class'] ?? '',
       confidence: json['confidence'] ?? '0%',
-      confidenceValue: json['confidence_value'] ?? 0.0,
+        confidenceValue: (json['confidence_value'] is num)
+          ? (json['confidence_value'] as num).toDouble()
+          : 0.0,
       allPredictions: Map<String, dynamic>.from(
         json['all_predictions'] ?? {},
       ),

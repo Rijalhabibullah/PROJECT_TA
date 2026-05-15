@@ -233,7 +233,9 @@ class _ResultScreenState extends State<ResultScreen> {
                   ),
                   const SizedBox(height: 16),
                   ...widget.result.allPredictions.entries.map((entry) {
-                    final score = entry.value as double;
+                    final score = (entry.value is num)
+                      ? (entry.value as num).toDouble()
+                      : 0.0;
                     final percentage = (score * 100).toStringAsFixed(2);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -268,9 +270,12 @@ class _ResultScreenState extends State<ResultScreen> {
             ),
             
             const SizedBox(height: 30),
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text("Rekomendasi Produk:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text(
+                "Rekomendasi Produk untuk ${_normalizeDiseaseName(widget.result.diseaseInfo.name)}:",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 15),
             
@@ -312,6 +317,8 @@ class _ResultScreenState extends State<ResultScreen> {
                 }
                 
                 final products = snapshot.data ?? [];
+                final diseaseName = _normalizeDiseaseName(widget.result.diseaseInfo.name);
+                final filteredProducts = _filterProducts(products, diseaseName);
                 
                 if (products.isEmpty) {
                   return Container(
@@ -326,19 +333,24 @@ class _ResultScreenState extends State<ResultScreen> {
                   );
                 }
                 
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 15,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    return _buildProductCard(products[index]);
-                  },
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 15,
+                        mainAxisSpacing: 15,
+                        childAspectRatio: 0.75,
+                      ),
+                      itemCount: filteredProducts.length,
+                      itemBuilder: (context, index) {
+                        return _buildProductCard(filteredProducts[index]);
+                      },
+                    ),
+                  ],
                 );
               },
             ),
@@ -540,6 +552,47 @@ class _ResultScreenState extends State<ResultScreen> {
       }
     }
     return buffer.toString();
+  }
+
+  String _normalizeDiseaseName(String diseaseName) {
+    final normalized = {
+      'Bacterial Blight': 'Bacterial Blight',
+      'bacterial blight': 'Bacterial Blight',
+      'Bacterialblight': 'Bacterial Blight',
+      'Bercak Bakteri (Bacterial Blight)': 'Bacterial Blight',
+      'Brown Spot': 'Brown Spot',
+      'brown spot': 'Brown Spot',
+      'Brownspot': 'Brown Spot',
+      'Bercak Coklat (Brown Spot)': 'Brown Spot',
+      'Leaf Smut': 'Leaf Smut',
+      'leaf smut': 'Leaf Smut',
+      'Leafsmut': 'Leaf Smut',
+      'Jamur Daun (Leaf Smut)': 'Leaf Smut',
+      'Healthy': 'Healthy',
+      'healthy': 'Healthy',
+      'Sehat (Healthy)': 'Healthy',
+    };
+
+    return normalized[diseaseName] ?? diseaseName;
+  }
+
+  List<ProductItem> _filterProducts(
+    List<ProductItem> products,
+    String disease,
+  ) {
+    if (disease == 'Healthy') {
+      return products;
+    }
+
+    final tagged = products.where((product) {
+      final tag = product.diseaseTag;
+      if (tag == null || tag.trim().isEmpty) {
+        return false;
+      }
+      return _normalizeDiseaseName(tag) == disease;
+    }).toList();
+
+    return tagged;
   }
 
   void _showDetailPopup(BuildContext context) {

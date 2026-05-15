@@ -19,7 +19,15 @@ class ClassificationHistoryController extends Controller
             $query->where('user_id', (int) $request->input('user_id'));
         }
 
-        $classifications = $query->paginate(15);
+        $perPage = (int) $request->input('per_page', 15);
+        if ($perPage < 1) {
+            $perPage = 15;
+        }
+        if ($perPage > 1000) {
+            $perPage = 1000;
+        }
+
+        $classifications = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
