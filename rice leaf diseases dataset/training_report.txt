@@ -4,11 +4,11 @@ RICE LEAF DISEASE CLASSIFICATION - MODEL TRAINING REPORT
 
 DATASET INFORMATION:
 --------------------------------------------------------------------------------
-Total Training Samples:      3278
-Total Validation Samples:     703
-Total Test Samples:           703
-Number of Classes:              3
-Classes:                   Bacterialblight, Brownspot, Leafsmut
+Total Training Samples:      2720
+Total Validation Samples:     583
+Total Test Samples:           583
+Number of Classes:              4
+Classes:                   Bacterialblight, Brownspot, Healthy, Leafsmut
 Image Size (pixels):       224 x 224
 
 TRAINING CONFIGURATION:
@@ -21,9 +21,9 @@ Total Epochs Trained:      50
 
 MODEL PERFORMANCE:
 --------------------------------------------------------------------------------
-Test Loss:                 0.0002
-Test Accuracy:             1.0000
-Best Training Accuracy:    0.9942
+Test Loss:                 0.0201
+Test Accuracy:             0.9966
+Best Training Accuracy:    0.9835
 Best Validation Accuracy:  1.0000
 
 SAVED FILES:
