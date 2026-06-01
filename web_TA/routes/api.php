@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ClassificationHistoryController;
+use App\Http\Controllers\HealthController;
+use App\Http\Controllers\DebugController;
 use App\Http\Controllers\ProductController;
 
 /*
@@ -54,4 +56,17 @@ Route::prefix('classifications')->group(function () {
 
 // Products endpoint for mobile
 Route::get('/products', [ProductController::class, 'apiIndex']);
+
+// Health check endpoints
+Route::prefix('health')->group(function () {
+    Route::get('/', [HealthController::class, 'check']);
+    Route::get('/diagnose', [HealthController::class, 'diagnose']);
+});
+
+// Debug endpoints
+Route::prefix('debug')->group(function () {
+    Route::post('/raw-classify', [DebugController::class, 'rawClassify']);
+    Route::get('/logs', [DebugController::class, 'logs']);
+    Route::post('/test-image-processing', [DebugController::class, 'testImageProcessing']);
+});
 

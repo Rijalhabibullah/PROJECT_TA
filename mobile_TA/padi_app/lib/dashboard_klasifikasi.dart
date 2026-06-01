@@ -69,8 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _getImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(
       source: source,
-      imageQuality: 85,
-      maxWidth: 1280,
     );
     if (pickedFile != null) {
       if (kIsWeb) {
@@ -156,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       // Validasi: cek apakah confidence cukup tinggi (artinya itu daun padi)
-      const double confidenceThreshold = 0.85; // 85% minimum - sangat ketat
+      const double confidenceThreshold = 0.60; // 60% minimum - sesuai dengan backend
       if (result.confidenceValue < confidenceThreshold) {
         if (mounted) {
           _showNotRiceLeafWarning(context);

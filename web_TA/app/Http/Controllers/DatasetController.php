@@ -3,9 +3,11 @@ namespace App\Http\Controllers;
 use App\Models\Dataset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Traits\CompressesImages;
 
 class DatasetController extends Controller
 {
+    use CompressesImages;
     public function index(Request $request) {
         // Get filter parameters
         $label = $request->get('label');
@@ -33,7 +35,8 @@ class DatasetController extends Controller
             'image' => 'required|image|mimes:jpeg,png,jpg|max:2048'
         ]);
 
-        $path = $request->file('image')->store('datasets', 'public');
+        $path = $this->compressAndStoreImage($request->file('image'), 'datasets')
+            ?? $request->file('image')->store('datasets', 'public');
 
         Dataset::create([
             'label' => $request->label,

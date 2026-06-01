@@ -1,13 +1,13 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 
 Future<File> compressImageFile(File input, {
-  int minWidth = 1280,
-  int minHeight = 1280,
-  int quality = 75,
+  int quality = 80,
   int maxBytes = 500 * 1024,
 }) async {
   if (kIsWeb) {
@@ -19,22 +19,34 @@ Future<File> compressImageFile(File input, {
     return input;
   }
 
-  final tempDir = await getTemporaryDirectory();
-  final targetPath =
-      '${tempDir.path}/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  try {
+    // Decode image dimensions to keep the original resolution
+    final Uint8List bytes = await input.readAsBytes();
+    final ui.Codec codec = await ui.instantiateImageCodec(bytes);
+    final ui.FrameInfo frameInfo = await codec.getNextFrame();
+    final int originalWidth = frameInfo.image.width;
+    final int originalHeight = frameInfo.image.height;
 
-  final compressed = await FlutterImageCompress.compressAndGetFile(
-    input.path,
-    targetPath,
-    quality: quality,
-    minWidth: minWidth,
-    minHeight: minHeight,
-    format: CompressFormat.jpeg,
-  );
+    final tempDir = await getTemporaryDirectory();
+    final targetPath =
+        '${tempDir.path}/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-  if (compressed == null) {
+    final compressed = await FlutterImageCompress.compressAndGetFile(
+      input.path,
+      targetPath,
+      quality: quality,
+      minWidth: originalWidth,
+      minHeight: originalHeight,
+      format: CompressFormat.jpeg,
+    );
+
+    if (compressed == null) {
+      return input;
+    }
+
+    return File(compressed.path);
+  } catch (e) {
+    debugPrint('Error compressing image: $e');
     return input;
   }
-
-  return File(compressed.path);
 }

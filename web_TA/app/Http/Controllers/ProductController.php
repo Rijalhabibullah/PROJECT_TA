@@ -4,9 +4,11 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Traits\CompressesImages;
 
 class ProductController extends Controller
 {
+    use CompressesImages;
     public function index() {
         $products = Product::all();
         return view('admin.products.index', compact('products'));
@@ -27,7 +29,7 @@ class ProductController extends Controller
 
         $imagePath = $product->image;
         if ($request->hasFile('image')) {
-            $newPath = $this->compressAndStoreProductImage($request->file('image'))
+            $newPath = $this->compressAndStoreImage($request->file('image'), 'products')
                 ?? $request->file('image')->store('products', 'public');
 
             if ($newPath) {
@@ -61,7 +63,7 @@ class ProductController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('image')) {
-            $imagePath = $this->compressAndStoreProductImage($request->file('image'))
+            $imagePath = $this->compressAndStoreImage($request->file('image'), 'products')
                 ?? $request->file('image')->store('products', 'public');
         }
 
@@ -103,74 +105,5 @@ class ProductController extends Controller
             'success' => true,
             'data' => $products,
         ]);
-    }
-
-    private function compressAndStoreProductImage($file): ?string
-    {
-        if (!function_exists('imagecreatefromjpeg')) {
-            return null;
-        }
-
-        $mime = $file->getMimeType();
-        $sourcePath = $file->getRealPath();
-
-        if (!$sourcePath) {
-            return null;
-        }
-
-        switch ($mime) {
-            case 'image/jpeg':
-                $image = imagecreatefromjpeg($sourcePath);
-                break;
-            case 'image/png':
-                $image = imagecreatefrompng($sourcePath);
-                break;
-            case 'image/webp':
-                if (!function_exists('imagecreatefromwebp')) {
-                    return null;
-                }
-                $image = imagecreatefromwebp($sourcePath);
-                break;
-            default:
-                return null;
-        }
-
-        if (!$image) {
-            return null;
-        }
-
-        $maxWidth = 1280;
-        $quality = 75;
-        $width = imagesx($image);
-        $height = imagesy($image);
-
-        if ($width > $maxWidth) {
-            $newHeight = (int) round($height * ($maxWidth / $width));
-            $resized = imagecreatetruecolor($maxWidth, $newHeight);
-            $white = imagecolorallocate($resized, 255, 255, 255);
-            imagefill($resized, 0, 0, $white);
-            imagecopyresampled(
-                $resized,
-                $image,
-                0,
-                0,
-                0,
-                0,
-                $maxWidth,
-                $newHeight,
-                $width,
-                $height
-            );
-            imagedestroy($image);
-            $image = $resized;
-        }
-
-        $filename = 'products/' . Str::uuid() . '.jpg';
-        $fullPath = storage_path('app/public/' . $filename);
-
-        imagejpeg($image, $fullPath, $quality);
-        imagedestroy($image);
-
-        return $filename;
     }
 }

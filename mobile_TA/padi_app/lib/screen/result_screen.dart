@@ -37,7 +37,7 @@ class _ResultScreenState extends State<ResultScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Card Penyakit Terdeteksi
+            // Card Penyakit Terdeteksi / Status Daun
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -48,10 +48,17 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
               child: Column(
                 children: [
-                  const Text("Penyakit Terdeteksi:", style: TextStyle(fontSize: 16)),
+                  Text(
+                    widget.result.predictedClass == 'Healthy' ? "Status Daun:" : "Penyakit Terdeteksi:",
+                    style: const TextStyle(fontSize: 16),
+                  ),
                   Text(
                     widget.result.diseaseInfo.name,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: widget.result.predictedClass == 'Healthy' ? Colors.green : Colors.red,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   
@@ -385,7 +392,9 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Color _getSeverityColor(String severity) {
-    if (severity.toLowerCase().contains('tinggi') || severity.toLowerCase().contains('high')) {
+    if (severity.toLowerCase().contains('tidak ada') || severity.toLowerCase().contains('none')) {
+      return Colors.green;
+    } else if (severity.toLowerCase().contains('tinggi') || severity.toLowerCase().contains('high')) {
       return Colors.red;
     } else if (severity.toLowerCase().contains('sedang') || severity.toLowerCase().contains('medium')) {
       return Colors.orange;

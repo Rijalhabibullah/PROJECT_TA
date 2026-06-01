@@ -4,12 +4,16 @@ namespace App\Services;
 
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\FlockStore;
 
 class PythonClassificationService
 {
     private string $pythonExecutable;
     private string $scriptPath;
     private string $modelDirectory;
+    private static ?\Symfony\Component\Lock\Lock $modelLoadLock = null;
+    private static bool $modelLoaded = false;
 
     public function __construct()
     {
@@ -20,7 +24,34 @@ class PythonClassificationService
 
     public function classifyFromBase64(array $payload): array
     {
-        return $this->runAction('classify', $payload, 120);
+        // Add retry logic for transient failures
+        $maxRetries = 3;
+        $lastError = null;
+        
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                // Queue classification with exclusive lock to prevent concurrent model loads
+                return $this->runActionWithLock('classify', $payload, 120);
+            } catch (RuntimeException $e) {
+                $lastError = $e;
+                $errorMsg = $e->getMessage();
+                
+                // Only retry on specific errors (memory, timeout)
+                if (strpos($errorMsg, 'timeout') === false && 
+                    strpos($errorMsg, 'memory') === false &&
+                    strpos($errorMsg, 'TensorFlow') === false) {
+                    throw $e;
+                }
+                
+                if ($attempt < $maxRetries) {
+                    // Wait before retry (exponential backoff)
+                    sleep($attempt);
+                    continue;
+                }
+            }
+        }
+        
+        throw $lastError ?? new RuntimeException('Klasifikasi gagal setelah percobaan berulang');
     }
 
     public function classifyFromUrl(array $payload): array
@@ -36,6 +67,46 @@ class PythonClassificationService
     public function info(): array
     {
         return $this->runAction('info');
+    }
+
+    /**
+     * Run action with file lock to prevent concurrent model loads
+     * @param string $action
+     * @param array $payload
+     * @param int $timeout
+     * @return array
+     */
+    private function runActionWithLock(string $action, array $payload = [], int $timeout = 60): array
+    {
+        $lockPath = storage_path('locks/model_' . md5($this->modelDirectory) . '.lock');
+        @mkdir(dirname($lockPath), 0755, true);
+        
+        $lockFile = fopen($lockPath, 'c');
+        if (!$lockFile) {
+            throw new RuntimeException("Tidak dapat membuat lock file di {$lockPath}");
+        }
+        
+        // Wait for exclusive lock (blocking) with timeout
+        $lockStart = time();
+        $lockTimeout = min(60, $timeout - 5); // Reserve 5 seconds for execution
+        
+        while (!flock($lockFile, LOCK_EX | LOCK_NB)) {
+            if (time() - $lockStart > $lockTimeout) {
+                fclose($lockFile);
+                throw new RuntimeException('Model sedang diproses, silahkan coba lagi dalam beberapa detik');
+            }
+            usleep(100000); // 100ms wait
+        }
+        
+        try {
+            // Reset model state to load fresh
+            $payload['_skip_cache'] = true;
+            $result = $this->runAction($action, $payload, $timeout);
+            return $result;
+        } finally {
+            flock($lockFile, LOCK_UN);
+            fclose($lockFile);
+        }
     }
 
     private function runAction(string $action, array $payload = [], int $timeout = 60): array
@@ -54,13 +125,25 @@ class PythonClassificationService
 
         $process = new Process($command, base_path(), $this->buildProcessEnvironment());
         $process->setTimeout($timeout);
+        $process->setIdleTimeout($timeout - 5); // Prevent premature termination
         $process->setInput(json_encode($payload, JSON_UNESCAPED_SLASHES));
-        $process->run();
-
-        if (!$process->isSuccessful()) {
+        
+        try {
+            $process->mustRun();
+        } catch (\Symfony\Component\Process\Exception\ProcessFailedException $e) {
             $stderr = trim($process->getErrorOutput());
             $stdout = trim($process->getOutput());
-            throw new RuntimeException($stderr !== '' ? $stderr : ($stdout !== '' ? $stdout : 'Gagal menjalankan proses inferensi Python'));
+            
+            // Enhanced error logging
+            $errorLog = "Python Process Error:\n";
+            $errorLog .= "Action: {$action}\n";
+            $errorLog .= "Exit Code: {$process->getExitCode()}\n";
+            if ($stderr) $errorLog .= "STDERR: {$stderr}\n";
+            if ($stdout) $errorLog .= "STDOUT: {$stdout}\n";
+            
+            \Log::error($errorLog);
+            
+            throw new RuntimeException($stderr ?: ($stdout ?: 'Gagal menjalankan proses inferensi Python'));
         }
 
         $output = trim($process->getOutput());
@@ -70,7 +153,7 @@ class PythonClassificationService
 
         $decoded = json_decode($output, true);
         if (!is_array($decoded)) {
-            throw new RuntimeException('Output inferensi Python bukan JSON yang valid.');
+            throw new RuntimeException('Output inferensi Python bukan JSON yang valid: ' . substr($output, 0, 100));
         }
 
         return $decoded;

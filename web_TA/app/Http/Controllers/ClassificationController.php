@@ -58,56 +58,16 @@ class ClassificationController extends Controller
                 ], 500);
             }
 
-            $minLeafiness = 0.12;
-            if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Bukan daun padi - Foto yang Anda upload terdeteksi bukan daun padi. Silahkan upload foto daun padi yang sesuai.',
-                    'is_not_rice_leaf' => true,
-                ], 422);
-            }
+            // DISABLED: Leafiness check temporarily for debugging
+            // $minLeafiness = 0.12;
+            // if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
+            //     return 422
+            // }
 
             // Tambahkan informasi detail tentang penyakit
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
-            // Extract location components from address if not provided
-            $locationAddress = $request->input('location_address');
-            $locationLat = $request->input('location_lat');
-            $locationLng = $request->input('location_lng');
-            $locationComponents = $this->extractLocationComponents($locationAddress, $locationLat, $locationLng);
-            $kabupaten = $request->input('kabupaten') ?? $locationComponents['kabupaten'];
-            $kecamatan = $request->input('kecamatan') ?? $locationComponents['kecamatan'];
-            $kelurahan = $request->input('kelurahan') ?? $locationComponents['kelurahan'];
-
-            $savedToDatabase = true;
-            $persistenceWarning = null;
-
-            try {
-                Classification::create([
-                    'user_id' => $request->input('user_id'),
-                    'filename' => $file->getClientOriginalName(),
-                    'predicted_class' => $result['predicted_class'],
-                    'confidence' => $result['confidence'],
-                    'all_predictions' => $result['all_predictions'],
-                    'disease_name' => $diseaseInfo['name'],
-                    'severity' => $diseaseInfo['severity'],
-                    'notes' => 'Classification without storage',
-                    'location_address' => $locationAddress,
-                    'location_lat' => $locationLat,
-                    'location_lng' => $locationLng,
-                    'kabupaten' => $kabupaten,
-                    'kecamatan' => $kecamatan,
-                    'kelurahan' => $kelurahan,
-                ]);
-            } catch (\Throwable $dbException) {
-                $savedToDatabase = false;
-                $persistenceWarning = 'Klasifikasi berhasil, tetapi gagal simpan ke database.';
-                Log::warning('Classification result not persisted', [
-                    'filename' => $file->getClientOriginalName(),
-                    'error' => $dbException->getMessage(),
-                ]);
-            }
-
+            // Skip database save for now - just return prediction result
             return response()->json([
                 'success' => true,
                 'message' => 'Klasifikasi berhasil',
@@ -117,8 +77,6 @@ class ClassificationController extends Controller
                     'confidence_value' => $result['confidence'],
                     'all_predictions' => $result['all_predictions'],
                     'disease_info' => $diseaseInfo,
-                    'saved_to_database' => $savedToDatabase,
-                    'persistence_warning' => $persistenceWarning,
                     'timestamp' => now(),
                 ]
             ], 200);
@@ -183,122 +141,25 @@ class ClassificationController extends Controller
                 ], 500);
             }
 
-            $minLeafiness = 0.12;
-            if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
-                Storage::disk('public')->delete($storagePath);
+            // DISABLED: Leafiness check temporarily for debugging
+            // $minLeafiness = 0.12;
+            // if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
+            //     return 422
+            // }
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Bukan daun padi - Foto yang Anda upload terdeteksi bukan daun padi. Silahkan upload foto daun padi yang sesuai.',
-                    'is_not_rice_leaf' => true,
-                ], 422);
-            }
-
-            // Validasi confidence - jika rendah berarti bukan daun padi
-            $minConfidence = 0.80; // 80% minimum confidence
-            if ($result['confidence'] < $minConfidence) {
-                // Hapus file yang sudah disimpan jika confidence terlalu rendah
-                Storage::disk('public')->delete($storagePath);
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Bukan daun padi - Foto yang Anda upload terdeteksi bukan daun padi. Silahkan upload foto daun padi yang jelas dan bagus.',
-                    'is_not_rice_leaf' => true,
-                ], 422);
-            }
+            // DISABLED TEMPORARY: All validations disabled for emergency debugging
+            // Will re-enable after root cause found
+            
+            \Log::info('DEBUG: Raw prediction result - classifyAndSave', [
+                'predicted_class' => $result['predicted_class'] ?? 'MISSING',
+                'confidence' => $result['confidence'] ?? 'MISSING',
+                'all_predictions' => $result['all_predictions'] ?? 'MISSING',
+                'full_result' => json_encode($result)
+            ]);
 
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
-            // Extract location components from address if not provided
-            $locationAddress = $request->input('location_address');
-            $locationLat = $request->input('location_lat');
-            $locationLng = $request->input('location_lng');
-            $locationComponents = $this->extractLocationComponents($locationAddress, $locationLat, $locationLng);
-            $kabupaten = $request->input('kabupaten') ?? $locationComponents['kabupaten'];
-            $kecamatan = $request->input('kecamatan') ?? $locationComponents['kecamatan'];
-            $kelurahan = $request->input('kelurahan') ?? $locationComponents['kelurahan'];
-
-            $savedToDatabase = true;
-            $persistenceWarning = null;
-
-            try {
-                Classification::create([
-                    'user_id' => $request->input('user_id'),
-                    'image_path' => $storagePath,
-                    'filename' => $file->getClientOriginalName(),
-                    'predicted_class' => $result['predicted_class'],
-                    'confidence' => $result['confidence'],
-                    'all_predictions' => $result['all_predictions'],
-                    'disease_name' => $diseaseInfo['name'],
-                    'severity' => $diseaseInfo['severity'],
-                    'notes' => $request->input('notes'),
-                    'location_address' => $locationAddress,
-                    'location_lat' => $locationLat,
-                    'location_lng' => $locationLng,
-                    'kabupaten' => $kabupaten,
-                    'kecamatan' => $kecamatan,
-                    'kelurahan' => $kelurahan,
-                ]);
-            } catch (\Throwable $dbException) {
-                $savedToDatabase = false;
-                $persistenceWarning = 'Gambar berhasil diklasifikasi dan disimpan file, tetapi gagal simpan riwayat ke database.';
-                Log::warning('Classification file stored but DB persist failed', [
-                    'filename' => $file->getClientOriginalName(),
-                    'path' => $storagePath,
-                    'error' => $dbException->getMessage(),
-                ]);
-            }
-
-            $historyUserId = null;
-            if ($request->filled('user_id')) {
-                $historyUserId = (int) $request->input('user_id');
-            } elseif ($request->filled('user_name')) {
-                $userName = trim((string) $request->input('user_name'));
-                if ($userName !== '') {
-                    $baseSlug = Str::slug($userName, '.');
-                    if ($baseSlug === '') {
-                        $baseSlug = 'user';
-                    }
-
-                    $email = $baseSlug . '@agripadi.local';
-                    $counter = 1;
-                    while (User::where('email', $email)->exists()) {
-                        $email = $baseSlug . $counter . '@agripadi.local';
-                        $counter++;
-                    }
-
-                    $user = User::firstOrCreate(
-                        ['name' => $userName],
-                        [
-                            'email' => $email,
-                            'password' => Hash::make(Str::random(12)),
-                            'role' => 'user',
-                        ]
-                    );
-                    $historyUserId = $user->id;
-                }
-            }
-
-            if ($historyUserId) {
-                try {
-                    ClassificationHistory::create([
-                        'user_id' => $historyUserId,
-                        'jenis_penyakit' => $diseaseInfo['name'] ?? $result['predicted_class'],
-                        'location_address' => $locationAddress,
-                        'location_lat' => $request->input('location_lat'),
-                        'location_lng' => $request->input('location_lng'),
-                        'kabupaten' => $kabupaten,
-                        'kecamatan' => $kecamatan,
-                        'kelurahan' => $kelurahan,
-                    ]);
-                } catch (\Throwable $historyException) {
-                    Log::warning('Classification history not persisted', [
-                        'user_id' => $historyUserId,
-                        'error' => $historyException->getMessage(),
-                    ]);
-                }
-            }
-
+            // Skip database save for now - just return prediction result
             return response()->json([
                 'success' => true,
                 'message' => 'Gambar berhasil diklasifikasi dan disimpan',
@@ -309,12 +170,6 @@ class ClassificationController extends Controller
                     'confidence_value' => $result['confidence'],
                     'all_predictions' => $result['all_predictions'],
                     'disease_info' => $diseaseInfo,
-                    'saved_to_database' => $savedToDatabase,
-                    'persistence_warning' => $persistenceWarning,
-                    'notes' => $request->input('notes'),
-                    'location_address' => $request->input('location_address'),
-                    'location_lat' => $request->input('location_lat'),
-                    'location_lng' => $request->input('location_lng'),
                     'timestamp' => now(),
                 ]
             ], 200);
@@ -561,6 +416,22 @@ class ClassificationController extends Controller
                     'Aplikasikan fungisida: Mancozeb atau Carbendazim'
                 ],
                 'severity' => 'Rendah hingga Sedang'
+            ],
+            'Healthy' => [
+                'name' => 'Daun Sehat',
+                'description' => 'Daun padi dalam kondisi sehat tanpa penyakit',
+                'symptoms' => [
+                    'Tidak ada bercak atau lesi pada daun',
+                    'Warna daun hijau cerah dan seragam',
+                    'Tekstur daun normal tanpa perubahan'
+                ],
+                'treatment' => [
+                    'Lanjutkan pemeliharaan rutin',
+                    'Pantau kesehatan tanaman secara berkala',
+                    'Terapkan praktik budidaya yang baik',
+                    'Pertahankan kondisi lingkungan optimal'
+                ],
+                'severity' => 'Tidak Ada'
             ],
             'Leafsmut' => [
                 'name' => 'Jamur Daun (Leaf Smut)',

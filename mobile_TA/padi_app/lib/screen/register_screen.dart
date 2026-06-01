@@ -45,7 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final response = await http
           .post(
-            Uri.parse('http://192.168.43.222:8000/api/mobile/register'),
+            Uri.parse('https://gobony-wedgy-cathi.ngrok-free.dev/api/mobile/register'),
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',

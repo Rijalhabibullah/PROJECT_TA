@@ -15,7 +15,7 @@ import requests
 from PIL import Image
 
 
-CLASS_NAMES = ["Bacterialblight", "Brownspot", "Leafsmut"]
+CLASS_NAMES = ["Bacterialblight", "Brownspot", "Healthy", "Leafsmut"]
 IMG_SIZE = (224, 224)
 
 try:
@@ -199,6 +199,8 @@ def action_classify_from_url(model_dir: str) -> None:
 
 
 def action_health(model_dir: str) -> None:
+    # Quick health check - don't load model to avoid timeout
+    # Model will be loaded on first classify request
     if not TENSORFLOW_AVAILABLE:
         message = "TensorFlow tidak tersedia"
         if TENSORFLOW_IMPORT_ERROR:
@@ -216,16 +218,21 @@ def action_health(model_dir: str) -> None:
         )
 
     try:
-        model = _load_model(model_dir)
+        # Just check if model file exists, don't load it
+        model_file = _find_model_file(model_dir)
+        if model_file is None:
+            raise RuntimeError(
+                "Model tidak ditemukan. Pastikan file rice_leaf_disease_model.keras ada."
+            )
+        
         _emit(
             {
                 "status": "ok",
-                "message": "Model siap digunakan",
-                "model_loaded": True,
-                "model_path": MODEL_PATH,
+                "message": "Server siap - Model akan di-load pada request pertama",
+                "model_loaded": False,  # Not loaded yet to prevent timeout
+                "model_file": model_file,
                 "python_executable": sys.executable,
                 "classes": CLASS_NAMES,
-                "input_shape": str(model.input_shape),
             },
             0,
         )

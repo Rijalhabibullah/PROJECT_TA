@@ -21,10 +21,10 @@ Total Epochs Trained:      50
 
 MODEL PERFORMANCE:
 --------------------------------------------------------------------------------
-Test Loss:                 0.0201
-Test Accuracy:             0.9966
-Best Training Accuracy:    0.9835
-Best Validation Accuracy:  1.0000
+Test Loss:                 0.0221
+Test Accuracy:             0.9983
+Best Training Accuracy:    0.9849
+Best Validation Accuracy:  0.9983
 
 SAVED FILES:
 --------------------------------------------------------------------------------
