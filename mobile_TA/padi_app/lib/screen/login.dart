@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../main.dart'; // Mengarah ke MainNavigation di main.dart
 import 'register_screen.dart'; 
+import '../utils/api_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -35,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final response = await http
           .post(
-            Uri.parse('https://gobony-wedgy-cathi.ngrok-free.dev/api/mobile/login'),
+            Uri.parse('${ApiConfig.apiRoot}/mobile/login'),
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
@@ -45,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'password': password,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
         throw Exception('Login gagal');

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// import 'login_screen.dart'; // Nanti ini dipakai untuk kembali ke halaman login
+import '../utils/api_config.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -45,7 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final response = await http
           .post(
-            Uri.parse('https://gobony-wedgy-cathi.ngrok-free.dev/api/mobile/register'),
+            Uri.parse('${ApiConfig.apiRoot}/mobile/register'),
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               'password_confirmation': confirmPassword,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 201) {
         final jsonResponse = jsonDecode(response.body);

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import '../utils/api_config.dart';
 
 class ProductItem {
   final int id;
@@ -44,7 +45,7 @@ class ProductItem {
 
 class ProductService {
   // Samakan dengan API root di classification_service.dart
-  static const String _apiRoot = 'https://gobony-wedgy-cathi.ngrok-free.dev/api';
+  static const String _apiRoot = ApiConfig.apiRoot;
   static const String _productsUrl = '$_apiRoot/products';
 
   final http.Client _httpClient;
@@ -55,7 +56,7 @@ class ProductService {
     try {
       final response = await _httpClient
           .get(Uri.parse(_productsUrl), headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
         throw Exception('Gagal mengambil produk');

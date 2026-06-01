@@ -213,7 +213,7 @@ class ClassificationService {
             Uri.parse('$_historyUrl?page=$page&per_page=1000$userParam'),
             headers: {'Accept': 'application/json'},
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
         throw Exception('Gagal mengambil riwayat');

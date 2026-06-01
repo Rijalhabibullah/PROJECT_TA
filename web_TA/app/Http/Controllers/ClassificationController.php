@@ -159,17 +159,72 @@ class ClassificationController extends Controller
 
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
 
-            // Skip database save for now - just return prediction result
+            // Extract location components
+            $locationAddress = $request->input('location_address');
+            $locationLat = $request->input('location_lat');
+            $locationLng = $request->input('location_lng');
+            $kabupaten = $request->input('kabupaten');
+            $kecamatan = $request->input('kecamatan');
+            $kelurahan = $request->input('kelurahan');
+
+            // Fallback parsing if address is provided but components are missing
+            if ($locationAddress && (!$kabupaten || !$kecamatan || !$kelurahan)) {
+                $parsedLoc = $this->extractLocationComponents($locationAddress, $locationLat, $locationLng);
+                $kabupaten = $kabupaten ?: $parsedLoc['kabupaten'];
+                $kecamatan = $kecamatan ?: $parsedLoc['kecamatan'];
+                $kelurahan = $kelurahan ?: $parsedLoc['kelurahan'];
+            }
+
+            // Simpan ke database Model Classification (untuk riwayat di mobile)
+            $classification = Classification::create([
+                'user_id' => $request->input('user_id'),
+                'image_path' => $storagePath,
+                'filename' => $file->getClientOriginalName(),
+                'predicted_class' => $result['predicted_class'],
+                'confidence' => (float) $result['confidence'],
+                'all_predictions' => $result['all_predictions'],
+                'disease_name' => $diseaseInfo['name'] ?? null,
+                'severity' => $diseaseInfo['severity'] ?? null,
+                'notes' => $request->input('notes'),
+                'location_address' => $locationAddress,
+                'location_lat' => $locationLat,
+                'location_lng' => $locationLng,
+                'kabupaten' => $kabupaten,
+                'kecamatan' => $kecamatan,
+                'kelurahan' => $kelurahan,
+            ]);
+
+            // Simpan ke database Model ClassificationHistory (untuk riwayat di web admin)
+            if ($request->filled('user_id')) {
+                ClassificationHistory::create([
+                    'user_id' => $request->input('user_id'),
+                    'jenis_penyakit' => $diseaseInfo['name'] ?? $result['predicted_class'],
+                    'location_address' => $locationAddress,
+                    'location_lat' => $locationLat,
+                    'location_lng' => $locationLng,
+                    'kabupaten' => $kabupaten,
+                    'kecamatan' => $kecamatan,
+                    'kelurahan' => $kelurahan,
+                ]);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Gambar berhasil diklasifikasi dan disimpan',
                 'data' => [
+                    'id' => $classification->id,
                     'image_path' => Storage::url($storagePath),
                     'predicted_class' => $result['predicted_class'],
                     'confidence' => round($result['confidence'] * 100, 2) . '%',
                     'confidence_value' => $result['confidence'],
                     'all_predictions' => $result['all_predictions'],
                     'disease_info' => $diseaseInfo,
+                    'location_address' => $classification->location_address,
+                    'location_lat' => $classification->location_lat,
+                    'location_lng' => $classification->location_lng,
+                    'kabupaten' => $classification->kabupaten,
+                    'kecamatan' => $classification->kecamatan,
+                    'kelurahan' => $classification->kelurahan,
                     'timestamp' => now(),
                 ]
             ], 200);
