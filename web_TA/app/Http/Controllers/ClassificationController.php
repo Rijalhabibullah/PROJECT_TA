@@ -58,11 +58,14 @@ class ClassificationController extends Controller
                 ], 500);
             }
 
-            // DISABLED: Leafiness check temporarily for debugging
-            // $minLeafiness = 0.12;
-            // if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
-            //     return 422
-            // }
+            // Validasi: cek apakah itu daun padi (menggunakan metrik leafiness dari Python)
+            $minLeafiness = 0.08;
+            if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bukan daun padi',
+                ], 422);
+            }
 
             // Tambahkan informasi detail tentang penyakit
             $diseaseInfo = $this->getDiseaseInfo($result['predicted_class']);
@@ -141,14 +144,17 @@ class ClassificationController extends Controller
                 ], 500);
             }
 
-            // DISABLED: Leafiness check temporarily for debugging
-            // $minLeafiness = 0.12;
-            // if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
-            //     return 422
-            // }
-
-            // DISABLED TEMPORARY: All validations disabled for emergency debugging
-            // Will re-enable after root cause found
+            // Validasi: cek apakah itu daun padi (menggunakan metrik leafiness dari Python)
+            $minLeafiness = 0.08;
+            if (isset($result['leafiness']) && $result['leafiness'] < $minLeafiness) {
+                // Hapus file yang sudah disimpan jika terdeteksi bukan daun padi
+                Storage::disk('public')->delete($storagePath);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bukan daun padi',
+                ], 422);
+            }
             
             \Log::info('DEBUG: Raw prediction result - classifyAndSave', [
                 'predicted_class' => $result['predicted_class'] ?? 'MISSING',

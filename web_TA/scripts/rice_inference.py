@@ -133,7 +133,7 @@ def _estimate_leafiness(image_bytes: bytes) -> float:
     val = hsv_array[:, :, 2]
 
     # Heuristic: green-ish pixels with enough saturation and brightness.
-    green_mask = (hue >= 50) & (hue <= 140) & (sat >= 40) & (val >= 40)
+    green_mask = (hue >= 25) & (hue <= 140) & (sat >= 30) & (val >= 30)
     return float(np.mean(green_mask))
 
 
