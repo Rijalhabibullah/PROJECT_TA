@@ -71,6 +71,7 @@ class AuthController extends Controller
                 'user_id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'avatar_url' => $user->avatar ? asset('storage/' . $user->avatar) : null,
             ],
         ], 200);
     }
@@ -120,7 +121,59 @@ class AuthController extends Controller
                 'user_id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'avatar_url' => null,
             ],
         ], 201);
+    }
+
+    // 6. Mobile Update Profile
+    public function mobileUpdateProfile(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'email' => ['required', 'email', 'max:255'],
+            'password' => ['nullable', 'string', 'min:4'],
+            'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+        ]);
+
+        $user = User::find($validated['user_id']);
+
+        // Cek jika email sudah digunakan oleh user lain
+        if (User::where('email', $validated['email'])->where('id', '!=', $user->id)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email sudah digunakan oleh pengguna lain',
+            ], 409);
+        }
+
+        $user->email = $validated['email'];
+
+        if (!empty($validated['password'])) {
+            $user->password = Hash::make($validated['password']);
+        }
+
+        // Proses upload avatar
+        if ($request->hasFile('avatar')) {
+            // Hapus avatar lama jika ada
+            if ($user->avatar) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
+            }
+            // Simpan avatar baru ke public disk di folder 'avatars'
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = $path;
+        }
+
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profil berhasil diperbarui',
+            'data' => [
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar_url' => $user->avatar ? asset('storage/' . $user->avatar) : null,
+            ],
+        ], 200);
     }
 }

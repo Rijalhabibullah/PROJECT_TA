@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../utils/api_config.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userKabupaten = "";
   String _userKecamatan = "";
   String _userKelurahan = "";
+  String _userAvatar = "";
 
   @override
   void initState() {
@@ -36,6 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _userKabupaten = prefs.getString('user_kabupaten') ?? '';
       _userKecamatan = prefs.getString('user_kecamatan') ?? '';
       _userKelurahan = prefs.getString('user_kelurahan') ?? '';
+      _userAvatar = prefs.getString('user_avatar') ?? '';
     });
   }
 
@@ -202,10 +209,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _openEditProfile() {
     final phoneController = TextEditingController(text: _userPhone);
-    final locationController = TextEditingController(text: _userLocation);
-    final kabupatenController = TextEditingController(text: _userKabupaten);
-    final kecamatanController = TextEditingController(text: _userKecamatan);
-    final kelurahanController = TextEditingController(text: _userKelurahan);
+    final emailController = TextEditingController(text: _userEmail);
+    final passwordController = TextEditingController();
+    bool isPasswordVisible = false;
+    bool isLoading = false;
+    File? pickedImage;
 
     showModalBottomSheet(
       context: context,
@@ -214,141 +222,258 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Edit Profil',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'No. Telepon',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Lokasi',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: kabupatenController,
-                decoration: const InputDecoration(
-                  labelText: 'Kabupaten',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: kecamatanController,
-                decoration: const InputDecoration(
-                  labelText: 'Kecamatan',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: kelurahanController,
-                decoration: const InputDecoration(
-                  labelText: 'Kelurahan',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextButton.icon(
-                onPressed: () async {
-                  final address = await _fetchCurrentAddress();
-                  if (address == null) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Lokasi tidak terdeteksi'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-                  locationController.text = address;
-                  
-                  // Load saved values from prefs
-                  final prefs = await SharedPreferences.getInstance();
-                  kabupatenController.text = prefs.getString('user_kabupaten') ?? '';
-                  kecamatanController.text = prefs.getString('user_kecamatan') ?? '';
-                  kelurahanController.text = prefs.getString('user_kelurahan') ?? '';
-                },
-                icon: const Icon(Icons.my_location),
-                label: const Text('Gunakan lokasi saat ini'),
-              ),
-              const SizedBox(height: 16),
-              Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setString(
-                          'user_phone',
-                          phoneController.text.trim(),
-                        );
-                        await prefs.setString(
-                          'user_location',
-                          locationController.text.trim(),
-                        );
-                        await prefs.setString(
-                          'user_kabupaten',
-                          kabupatenController.text.trim(),
-                        );
-                        await prefs.setString(
-                          'user_kecamatan',
-                          kecamatanController.text.trim(),
-                        );
-                        await prefs.setString(
-                          'user_kelurahan',
-                          kelurahanController.text.trim(),
-                        );
-
-                        if (mounted) {
-                          setState(() {
-                            _userPhone = phoneController.text.trim();
-                            _userLocation = locationController.text.trim();
-                            _userKabupaten = kabupatenController.text.trim();
-                            _userKecamatan = kecamatanController.text.trim();
-                            _userKelurahan = kelurahanController.text.trim();
+                  const Text(
+                    'Edit Profil',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey[200],
+                            border: Border.all(color: const Color(0xFF0F703A), width: 2),
+                            image: pickedImage != null
+                                ? DecorationImage(
+                                    image: FileImage(pickedImage!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : (_userAvatar.isNotEmpty
+                                    ? DecorationImage(
+                                        image: NetworkImage(_userAvatar),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null),
+                          ),
+                          child: pickedImage == null && _userAvatar.isEmpty
+                              ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: () async {
+                              final picker = ImagePicker();
+                              final source = await showDialog<ImageSource>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Pilih Sumber Foto'),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(Icons.camera_alt),
+                                        title: const Text('Kamera'),
+                                        onTap: () => Navigator.pop(context, ImageSource.camera),
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.photo_library),
+                                        title: const Text('Galeri'),
+                                        onTap: () => Navigator.pop(context, ImageSource.gallery),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                              if (source != null) {
+                                final file = await picker.pickImage(source: source, imageQuality: 80);
+                                if (file != null) {
+                                  setModalState(() {
+                                    pickedImage = File(file.path);
+                                  });
+                                }
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF0F703A),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'No. Telepon',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: !isPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Password Baru (Kosongkan jika tidak diubah)',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setModalState(() {
+                            isPasswordVisible = !isPasswordVisible;
                           });
-                        }
-
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F703A),
-                      ),
-                      child: const Text(
-                        'Simpan',
-                        style: TextStyle(color: Colors.white),
+                        },
                       ),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final navigator = Navigator.of(context);
+                                  final phone = phoneController.text.trim();
+                                  final email = emailController.text.trim();
+                                  final password = passwordController.text;
+
+                                  if (email.isEmpty) {
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Email tidak boleh kosong'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  setModalState(() {
+                                    isLoading = true;
+                                  });
+
+                                  try {
+                                    final prefs = await SharedPreferences.getInstance();
+                                    final userId = prefs.getInt('user_id') ?? 0;
+
+                                    final uri = Uri.parse('${ApiConfig.apiRoot}/mobile/update-profile');
+                                    final request = http.MultipartRequest('POST', uri);
+
+                                    request.headers.addAll({
+                                      'Accept': 'application/json',
+                                    });
+
+                                    request.fields['user_id'] = userId.toString();
+                                    request.fields['email'] = email;
+                                    if (password.isNotEmpty) {
+                                      request.fields['password'] = password;
+                                    }
+
+                                    if (pickedImage != null) {
+                                      final multipartFile = await http.MultipartFile.fromPath(
+                                        'avatar',
+                                        pickedImage!.path,
+                                      );
+                                      request.files.add(multipartFile);
+                                    }
+
+                                    final streamedResponse = await request.send();
+                                    final response = await http.Response.fromStream(streamedResponse);
+
+                                    final responseData = jsonDecode(response.body);
+
+                                    if (response.statusCode != 200) {
+                                      throw Exception(responseData['message'] ?? 'Gagal memperbarui profil');
+                                    }
+
+                                    final newAvatarUrl = responseData['data']?['avatar_url'] ?? '';
+
+                                    // Simpan ke SharedPreferences lokal
+                                    await prefs.setString('user_phone', phone);
+                                    await prefs.setString('user_email', email);
+                                    await prefs.setString('user_avatar', newAvatarUrl);
+
+                                    if (mounted) {
+                                      setState(() {
+                                        _userPhone = phone;
+                                        _userEmail = email;
+                                        _userAvatar = newAvatarUrl;
+                                      });
+                                    }
+
+                                    navigator.pop();
+                                    
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Profil berhasil diperbarui'),
+                                        backgroundColor: Color(0xFF0F703A),
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('Gagal memperbarui profil: ${e.toString().replaceAll('Exception: ', '')}'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  } finally {
+                                    setModalState(() {
+                                      isLoading = false;
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F703A),
+                          ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text(
+                                  'Simpan',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -367,19 +492,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final navigator = Navigator.of(context);
               SharedPreferences prefs = await SharedPreferences.getInstance();
               await prefs.setBool('isLoggedIn', false);
               await prefs.remove('user_id');
               await prefs.remove('user_name');
               await prefs.remove('user_email');
+              await prefs.remove('user_avatar');
               await prefs.remove('user_phone');
               await prefs.remove('user_location');
               await prefs.remove('user_kabupaten');
               await prefs.remove('user_kecamatan');
               await prefs.remove('user_kelurahan');
-              if (mounted) {
-                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-              }
+              navigator.pushNamedAndRemoveUntil('/', (route) => false);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text("Logout", style: TextStyle(color: Colors.white)),
@@ -430,10 +555,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF0F703A),
                         borderRadius: BorderRadius.circular(100),
+                        image: _userAvatar.isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(_userAvatar),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
-                      child: const Center(
-                        child: Icon(Icons.person, size: 100, color: Colors.white),
-                      ),
+                      child: _userAvatar.isEmpty
+                          ? const Center(
+                              child: Icon(Icons.person, size: 100, color: Colors.white),
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 20),

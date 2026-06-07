@@ -65,6 +65,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (data['email'] != null) {
         await prefs.setString('user_email', data['email'] ?? '');
       }
+      if (data['avatar_url'] != null) {
+        await prefs.setString('user_avatar', data['avatar_url'] ?? '');
+      }
 
       if (!mounted) return;
       Navigator.pushReplacement(

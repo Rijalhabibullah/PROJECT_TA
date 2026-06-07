@@ -37,6 +37,7 @@ Route::prefix('classification')->group(function () {
 // Mobile auth endpoint
 Route::post('/mobile/login', [AuthController::class, 'mobileLogin']);
 Route::post('/mobile/register', [AuthController::class, 'mobileRegister']);
+Route::post('/mobile/update-profile', [AuthController::class, 'mobileUpdateProfile']);
 
 // History endpoints
 Route::prefix('classifications')->group(function () {
