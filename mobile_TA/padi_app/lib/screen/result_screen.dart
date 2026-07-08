@@ -72,7 +72,7 @@ class _ResultScreenState extends State<ResultScreen> {
                     child: Column(
                       children: [
                         Text(
-                          "Confidence: ${widget.result.confidence}",
+                          "Akurasi: ${widget.result.confidence}",
                           style: TextStyle(
                             color: Colors.green[700],
                             fontWeight: FontWeight.bold,

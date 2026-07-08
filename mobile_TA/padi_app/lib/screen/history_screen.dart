@@ -214,7 +214,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   ),
                                   _infoRow(
                                     icon: Icons.bar_chart,
-                                    text: 'Confidence: ${item.confidence}',
+                                    text: 'Akurasi: ${item.confidence}',
                                   ),
                                   _infoRow(
                                     icon: Icons.location_on,
